@@ -143,7 +143,12 @@ export default function AdmissionsManagement() {
   }, []);
 
   const loadLeadSources = async () => {
-    const { data, error } = await supabase.from('admission_lead_sources').select('*').eq('school_id', schoolId).order('name');
+    const { data, error } = await supabase
+      .from('admission_lead_sources')
+      .select('*')
+      .eq('school_id', schoolId)
+      .eq('is_active', true)
+      .order('name');
     if (data && data.length > 0) {
       setLeadSources(data);
     } else {
@@ -184,16 +189,7 @@ export default function AdmissionsManagement() {
     if (data) setFunnelStages(data);
   };
 
-  const loadLeadSources = async () => {
-    const { data } = await supabase
-      .from('admission_lead_sources')
-      .select('*')
-      .eq('school_id', schoolId)
-      .eq('is_active', true)
-      .order('name');
 
-    if (data) setLeadSources(data);
-  };
 
   const loadClasses = async () => {
     const { data } = await supabase
