@@ -225,24 +225,41 @@ ALTER TABLE final_results ENABLE ROW LEVEL SECURITY;
 -- ... (We will use standard school_id based policies. For brevity in this initial script, defining key robust ones)
 
 -- 5.1 Common "View by School" Policy for Config Tables
+DROP POLICY IF EXISTS "School staff view configs" ON exam_types;
 CREATE POLICY "School staff view configs" ON exam_types FOR SELECT TO authenticated USING (school_id IN (SELECT school_id FROM user_profiles WHERE id = auth.uid()));
+
+DROP POLICY IF EXISTS "Admins manage exam types" ON exam_types;
 CREATE POLICY "Admins manage exam types" ON exam_types FOR ALL TO authenticated USING (school_id IN (SELECT school_id FROM user_profiles WHERE id = auth.uid() AND role_id IN (SELECT id FROM roles WHERE name IN ('ADMIN', 'SUPERADMIN'))));
 
+DROP POLICY IF EXISTS "School staff view grade scales" ON grade_scales;
 CREATE POLICY "School staff view grade scales" ON grade_scales FOR SELECT TO authenticated USING (school_id IN (SELECT school_id FROM user_profiles WHERE id = auth.uid()));
+
+DROP POLICY IF EXISTS "Admins manage grade scales" ON grade_scales;
 CREATE POLICY "Admins manage grade scales" ON grade_scales FOR ALL TO authenticated USING (school_id IN (SELECT school_id FROM user_profiles WHERE id = auth.uid() AND role_id IN (SELECT id FROM roles WHERE name IN ('ADMIN', 'SUPERADMIN'))));
 
 -- Grade Slabs (Indirect via Scale->School)
+DROP POLICY IF EXISTS "School staff view grade slabs" ON grade_slabs;
 CREATE POLICY "School staff view grade slabs" ON grade_slabs FOR SELECT TO authenticated USING (grade_scale_id IN (SELECT id FROM grade_scales WHERE school_id IN (SELECT school_id FROM user_profiles WHERE id = auth.uid())));
+
+DROP POLICY IF EXISTS "Admins manage grade slabs" ON grade_slabs;
 CREATE POLICY "Admins manage grade slabs" ON grade_slabs FOR ALL TO authenticated USING (grade_scale_id IN (SELECT id FROM grade_scales WHERE school_id IN (SELECT school_id FROM user_profiles WHERE id = auth.uid() AND role_id IN (SELECT id FROM roles WHERE name IN ('ADMIN', 'SUPERADMIN')))));
 
 -- 5.2 Exam Schedules
+DROP POLICY IF EXISTS "Staff view exams" ON exam_schedules;
 CREATE POLICY "Staff view exams" ON exam_schedules FOR SELECT TO authenticated USING (school_id IN (SELECT school_id FROM user_profiles WHERE id = auth.uid()));
+
+DROP POLICY IF EXISTS "Admins manage exams" ON exam_schedules;
 CREATE POLICY "Admins manage exams" ON exam_schedules FOR ALL TO authenticated USING (school_id IN (SELECT school_id FROM user_profiles WHERE id = auth.uid() AND role_id IN (SELECT id FROM roles WHERE name IN ('ADMIN', 'SUPERADMIN'))));
 
 -- 5.3 Marks Entry
 -- Teachers can INSERT/UPDATE marks if they are assigned to the class/subject (Logic is complex, simplifying to "Educators in School" for now, ideally strictly filtered)
+DROP POLICY IF EXISTS "Staff view marks" ON student_marks;
 CREATE POLICY "Staff view marks" ON student_marks FOR SELECT TO authenticated USING (exam_id IN (SELECT id FROM exam_schedules WHERE school_id IN (SELECT school_id FROM user_profiles WHERE id = auth.uid())));
+
+DROP POLICY IF EXISTS "Teachers enter marks" ON student_marks;
 CREATE POLICY "Teachers enter marks" ON student_marks FOR INSERT TO authenticated WITH CHECK (exam_id IN (SELECT id FROM exam_schedules WHERE school_id IN (SELECT school_id FROM user_profiles WHERE id = auth.uid() AND role_id IN (SELECT id FROM roles WHERE name IN ('ADMIN', 'EDUCATOR')))));
+
+DROP POLICY IF EXISTS "Teachers update marks" ON student_marks;
 CREATE POLICY "Teachers update marks" ON student_marks FOR UPDATE TO authenticated USING (exam_id IN (SELECT id FROM exam_schedules WHERE school_id IN (SELECT school_id FROM user_profiles WHERE id = auth.uid() AND role_id IN (SELECT id FROM roles WHERE name IN ('ADMIN', 'EDUCATOR')))));
 
 -- 5.4 Parents/Students Access (Strict!)
@@ -250,6 +267,7 @@ CREATE POLICY "Teachers update marks" ON student_marks FOR UPDATE TO authenticat
 -- (Assuming 'students' table has 'parent_id' or we map via 'student_parents' - Checking common schema)
 -- Standard schema usually puts parent_id on students or separate mapping.
 -- For now, basic restriction:
+DROP POLICY IF EXISTS "Parents view own child results" ON result_summaries;
 CREATE POLICY "Parents view own child results" ON result_summaries FOR SELECT TO authenticated 
 USING (
   student_id IN (
@@ -260,6 +278,6 @@ USING (
 -- =====================================================
 -- 6. INDEXES
 -- =====================================================
-CREATE INDEX idx_exam_schedules_school ON exam_schedules(school_id);
-CREATE INDEX idx_student_marks_exam_student ON student_marks(exam_id, student_id);
-CREATE INDEX idx_exam_subjects_exam ON exam_subjects(exam_id);
+CREATE INDEX IF NOT EXISTS idx_exam_schedules_school ON exam_schedules(school_id);
+CREATE INDEX IF NOT EXISTS idx_student_marks_exam_student ON student_marks(exam_id, student_id);
+CREATE INDEX IF NOT EXISTS idx_exam_subjects_exam ON exam_subjects(exam_id);
