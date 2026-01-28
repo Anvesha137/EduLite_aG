@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useSchool } from '../../hooks/useSchool';
 import {
-  UserPlus, Phone, Calendar, FileText, CheckCircle, XCircle, Clock,
-  TrendingUp, Users, Filter, Plus, Eye, Edit, MessageCircle, AlertCircle, X, Save
+  UserPlus, FileText, CheckCircle, XCircle, Clock,
+  TrendingUp, Users, Plus, Eye, MessageCircle, AlertCircle, Save
 } from 'lucide-react';
 import { formatDate } from '../../lib/helpers';
 import { Modal } from '../Modal';
@@ -155,6 +155,8 @@ export default function AdmissionsManagement() {
       .order('name');
     if (data && data.length > 0) {
       setLeadSources(data);
+      // Default to first source since we removed the UI selector
+      setLeadForm(prev => ({ ...prev, lead_source_id: data[0].id }));
     } else {
       // Seed default sources if empty
       const defaults = ['Walk-in', 'Phone Inquiry', 'Website', 'Reference', 'Social Media', 'Advertisement'];
@@ -216,47 +218,68 @@ export default function AdmissionsManagement() {
   };
 
   const loadLeads = async () => {
-    let query = supabase
-      .from('admission_leads')
-      .select(`
-        *,
-        applying_class:classes(id, grade),
-        current_stage:admission_funnel_stages(id, name, color_code, stage_category),
-        lead_source:admission_lead_sources(id, name),
-        assigned_counselor:user_profiles(name)
-      `)
-      .eq('school_id', schoolId)
-      .order('created_at', { ascending: false });
+    try {
+      const { data, error } = await supabase.rpc('get_admission_leads', { p_school_id: schoolId });
 
-    if (filterStage) {
-      query = query.eq('current_stage_id', filterStage);
-    }
-    if (filterStatus) {
-      query = query.eq('status', filterStatus);
-    }
-    if (filterSource) {
-      query = query.eq('lead_source_id', filterSource);
-    }
+      if (error) throw error;
 
-    const { data, error } = await query;
-    if (!error && data) {
-      setLeads(data as any);
+      if (data) {
+        // Transform RPC result to match Lead interface structure
+        const mappedLeads = data.map((l: any) => ({
+          id: l.id,
+          lead_number: l.lead_number,
+          student_name: l.student_name,
+          parent_name: l.parent_name,
+          contact_number: l.contact_number,
+          contact_email: l.contact_email,
+          applying_class: { grade: l.applying_class_grade },
+          current_stage: {
+            id: l.current_stage_id,
+            name: l.current_stage_name,
+            color_code: l.current_stage_color
+          },
+          lead_source: { id: l.lead_source_id, name: l.lead_source_name },
+          status: l.status,
+          priority: l.priority,
+          next_followup_date: l.next_followup_date,
+          created_at: l.created_at
+        }));
+
+        let filtered = mappedLeads;
+        if (filterStage) filtered = filtered.filter((l: any) => l.current_stage?.id === filterStage);
+        if (filterStatus) filtered = filtered.filter((l: any) => l.status === filterStatus);
+        if (filterSource) filtered = filtered.filter((l: any) => l.lead_source?.id === filterSource);
+
+        setLeads(filtered);
+      }
+    } catch (err) {
+      console.error('Error loading leads:', err);
     }
   };
 
   const loadApplications = async () => {
-    const { data, error } = await supabase
-      .from('admission_applications')
-      .select(`
-        *,
-        applying_class:classes(grade),
-        lead:admission_leads(lead_number)
-      `)
-      .eq('school_id', schoolId)
-      .order('application_date', { ascending: false });
+    try {
+      const { data, error } = await supabase.rpc('get_admission_applications', { p_school_id: schoolId });
 
-    if (!error && data) {
-      setApplications(data as any);
+      if (error) throw error;
+
+      if (data) {
+        const mappedApps = data.map((a: any) => ({
+          id: a.id,
+          application_number: a.application_number,
+          student_name: a.student_name,
+          parent_name: a.parent_name,
+          contact_number: a.contact_number,
+          applying_class: { grade: a.applying_class_grade },
+          status: a.status,
+          decision_status: a.decision_status,
+          application_date: a.application_date,
+          lead: { lead_number: a.lead_number }
+        }));
+        setApplications(mappedApps);
+      }
+    } catch (err) {
+      console.error('Error loading applications:', err);
     }
   };
 
@@ -286,41 +309,22 @@ export default function AdmissionsManagement() {
         throw new Error('User not authenticated');
       }
 
-      const leadNumber = await generateLeadNumber();
-      const firstStage = funnelStages.find(s => s.stage_order === 1);
-
-      const { data, error } = await supabase
-        .from('admission_leads')
-        .insert({
-          school_id: schoolId,
-          lead_number: leadNumber,
-          parent_name: leadForm.parent_name,
-          contact_number: leadForm.contact_number,
-          contact_email: leadForm.contact_email || null,
-          student_name: leadForm.student_name || null,
-          student_dob: leadForm.student_dob || null,
-          student_gender: leadForm.student_gender || null,
-          applying_class_id: leadForm.applying_class_id,
-          academic_year: leadForm.academic_year,
-          lead_source_id: leadForm.lead_source_id,
-          current_stage_id: firstStage?.id,
-          assigned_counselor_id: userId,
-          status: 'active',
-          priority: leadForm.priority,
-          notes: leadForm.notes || null,
-          previous_school: leadForm.previous_school || null,
-          address: leadForm.address || null,
-          referral_code: leadForm.referral_code || null,
-          referral_type: leadForm.referral_type || null,
-          created_by: userId,
-          updated_by: userId
-        })
-        .select()
-        .single();
+      const { data, error } = await supabase.rpc('create_admission_lead', {
+        p_school_id: schoolId,
+        p_parent_name: leadForm.parent_name,
+        p_contact_number: leadForm.contact_number,
+        p_lead_source_id: leadForm.lead_source_id,
+        p_applying_class_id: leadForm.applying_class_id,
+        p_academic_year: leadForm.academic_year,
+        p_student_name: leadForm.student_name,
+        p_priority: leadForm.priority,
+        p_notes: leadForm.notes,
+        p_user_id: userId
+      });
 
       if (error) throw error;
 
-      setMessage({ type: 'success', text: `Lead ${leadNumber} created successfully!` });
+      setMessage({ type: 'success', text: `Lead created successfully!` });
       setShowLeadModal(false);
       resetLeadForm();
       loadLeads();
@@ -385,13 +389,7 @@ export default function AdmissionsManagement() {
     }
   };
 
-  const generateLeadNumber = async () => {
-    const { data } = await supabase.rpc('generate_lead_number', {
-      p_school_id: schoolId,
-      p_academic_year: leadForm.academic_year
-    });
-    return data || `LEAD-${leadForm.academic_year}-${Date.now()}`;
-  };
+
 
   const resetLeadForm = () => {
     setLeadForm({
@@ -497,7 +495,7 @@ export default function AdmissionsManagement() {
           {[
             { id: 'leads', label: 'Leads & Funnel', icon: Users },
             { id: 'applications', label: 'Applications', icon: FileText },
-            { id: 'counsellors', label: 'Admission Counsellors', icon: User },
+            { id: 'counsellors', label: 'Admission Counsellors', icon: Users },
             { id: 'analytics', label: 'Analytics', icon: TrendingUp }
           ].map(tab => (
             <button
@@ -979,41 +977,20 @@ export default function AdmissionsManagement() {
             </div>
 
             <div className="col-span-1 md:col-span-2">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Lead Source *
-                  </label>
-                  <select
-                    required
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    value={leadForm.lead_source_id}
-                    onChange={(e) => setLeadForm({ ...leadForm, lead_source_id: e.target.value })}
-                  >
-                    <option value="">Select Source</option>
-                    {leadSources.map((source) => (
-                      <option key={source.id} value={source.id}>
-                        {source.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Priority
-                  </label>
-                  <select
-                    value={leadForm.priority}
-                    onChange={(e) => setLeadForm({ ...leadForm, priority: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  >
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                    <option value="urgent">Urgent</option>
-                  </select>
-                </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Priority
+                </label>
+                <select
+                  value={leadForm.priority}
+                  onChange={(e) => setLeadForm({ ...leadForm, priority: e.target.value })}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                >
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                  <option value="urgent">Urgent</option>
+                </select>
               </div>
             </div>
 

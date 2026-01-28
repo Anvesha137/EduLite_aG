@@ -33,8 +33,9 @@ import { Settings as SettingsPage } from '../admin/Settings';
 import IDCardManagement from '../admin/IDCardManagement';
 import CertificateManagement from '../admin/CertificateManagement';
 import AdmissionsManagement from '../admin/AdmissionsManagement';
+import { SubjectManagement } from '../admin/SubjectManagement';
 
-type View = 'dashboard' | 'students' | 'educators' | 'attendance' | 'exams' | 'fees' | 'announcements' | 'reports' | 'settings' | 'idcards' | 'certificates' | 'admissions';
+type View = 'dashboard' | 'students' | 'educators' | 'attendance' | 'exams' | 'fees' | 'announcements' | 'reports' | 'settings' | 'idcards' | 'certificates' | 'admissions' | 'subjects';
 
 const STORAGE_KEY = 'admin_current_view';
 
@@ -92,6 +93,7 @@ export function AdminDashboard() {
     { name: 'Attendance', icon: UserCheck, active: currentView === 'attendance', onClick: () => setCurrentView('attendance') },
     { name: 'Results & Exams', icon: BookOpen, active: currentView === 'exams', onClick: () => setCurrentView('exams') },
     { name: 'Fees', icon: DollarSign, active: currentView === 'fees', onClick: () => setCurrentView('fees') },
+    { name: 'Subjects', icon: BookOpen, active: currentView === 'subjects', onClick: () => setCurrentView('subjects') },
     { name: 'ID Cards', icon: CreditCard, active: currentView === 'idcards', onClick: () => setCurrentView('idcards') },
     { name: 'Certificates', icon: Award, active: currentView === 'certificates', onClick: () => setCurrentView('certificates') },
     { name: 'Announcements', icon: Megaphone, active: currentView === 'announcements', onClick: () => setCurrentView('announcements') },
@@ -263,6 +265,7 @@ export function AdminDashboard() {
           {currentView === 'attendance' && <AttendanceManagement />}
           {currentView === 'exams' && <ResultsManagement />}
           {currentView === 'fees' && <FeeManagement />}
+          {currentView === 'subjects' && <SubjectManagement />}
           {currentView === 'idcards' && <IDCardManagement />}
           {currentView === 'certificates' && <CertificateManagement />}
           {currentView === 'announcements' && <AnnouncementManagement />}
