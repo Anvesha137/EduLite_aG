@@ -229,6 +229,11 @@ function ScheduleExamModal({ isOpen, onClose, schoolId, onSave }: any) {
                                     <option value="">Select Type</option>
                                     {types.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                                 </select>
+                                {types.length === 0 && (
+                                    <p className="text-xs text-red-500 mt-1">
+                                        No Exam Types found. <span className="underline cursor-pointer" onClick={onClose}>Go to Configuration</span> to add them.
+                                    </p>
+                                )}
                             </div>
                             <div>
                                 <label className="block text-sm font-medium text-slate-700">Academic Year</label>
@@ -272,8 +277,8 @@ function ScheduleExamModal({ isOpen, onClose, schoolId, onSave }: any) {
                                     key={cls.id}
                                     onClick={() => toggleClass(cls.id)}
                                     className={`p-3 rounded-lg border cursor-pointer transition-colors text-center ${form.selectedClassIds.includes(cls.id)
-                                            ? 'border-blue-600 bg-blue-50 text-blue-700'
-                                            : 'border-slate-200 hover:border-blue-400'
+                                        ? 'border-blue-600 bg-blue-50 text-blue-700'
+                                        : 'border-slate-200 hover:border-blue-400'
                                         }`}
                                 >
                                     <span className="font-bold">{cls.grade}</span>

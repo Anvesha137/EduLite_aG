@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, DollarSign, FileText, CheckCircle, AlertCircle } from 'lucide-react';
+import { Search, DollarSign, FileText, CheckCircle, AlertCircle, Printer } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useSchool } from '../../hooks/useSchool';
 import { formatCurrency, formatDate } from '../../lib/helpers';
@@ -47,6 +47,7 @@ export function FeeManagement() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showInstallmentsModal, setShowInstallmentsModal] = useState(false);
   const [showDiscountModal, setShowDiscountModal] = useState(false);
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [selectedStudentFee, setSelectedStudentFee] = useState<StudentFeeData | null>(null);
   const [currentAcademicYear] = useState('2024-25');
 
@@ -113,7 +114,7 @@ export function FeeManagement() {
       }));
 
       setStudentFees(formattedData);
-      
+
       // MOCK DATA INJECTION
       if (formattedData.length === 0) {
         setStudentFees([
@@ -182,7 +183,7 @@ export function FeeManagement() {
             section_id: 'mock-sec-3'
           }
         ]);
-        
+
         // Ensure we have some classes for filter if empty
         if (classes.length === 0) {
           setClasses([
@@ -377,6 +378,16 @@ export function FeeManagement() {
                       >
                         <FileText className="w-4 h-4" />
                       </button>
+                      <button
+                        onClick={() => {
+                          setSelectedStudentFee(fee);
+                          setShowReceiptModal(true);
+                        }}
+                        className="p-2 hover:bg-purple-50 text-purple-600 rounded-lg transition-colors"
+                        title="Print Receipt"
+                      >
+                        <Printer className="w-4 h-4" />
+                      </button>
                       {fee.discount_amount === 0 && (
                         <button
                           onClick={() => handleRequestDiscount(fee)}
@@ -435,6 +446,15 @@ export function FeeManagement() {
             onSave={loadData}
             schoolId={schoolId!}
             userId={userId!}
+          />
+          <ReceiptModal
+            isOpen={showReceiptModal}
+            onClose={() => {
+              setShowReceiptModal(false);
+              setSelectedStudentFee(null);
+            }}
+            studentFee={selectedStudentFee}
+            schoolId={schoolId!}
           />
         </>
       )}

@@ -132,12 +132,29 @@ export default function AdmissionsManagement() {
     notes: ''
   });
 
+  // Hardcoded grades as requested
+  const GRADE_LEVELS = ['Nursery', 'LKG', 'UKG', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
+
   useEffect(() => {
     loadData();
     loadFunnelStages();
     loadLeadSources();
     loadClasses();
   }, []);
+
+  const loadLeadSources = async () => {
+    const { data, error } = await supabase.from('admission_lead_sources').select('*').eq('school_id', schoolId).order('name');
+    if (data && data.length > 0) {
+      setLeadSources(data);
+    } else {
+      // Seed default sources if empty
+      const defaults = ['Walk-in', 'Phone Inquiry', 'Website', 'Reference', 'Social Media', 'Advertisement'];
+      const { data: newSources } = await supabase.from('admission_lead_sources').insert(
+        defaults.map(name => ({ school_id: schoolId, name, type: 'other', is_active: true }))
+      ).select();
+      if (newSources) setLeadSources(newSources);
+    }
+  };
 
   useEffect(() => {
     if (activeTab === 'leads') {
@@ -480,6 +497,7 @@ export default function AdmissionsManagement() {
           {[
             { id: 'leads', label: 'Leads & Funnel', icon: Users },
             { id: 'applications', label: 'Applications', icon: FileText },
+            { id: 'counsellors', label: 'Admission Counsellors', icon: User },
             { id: 'analytics', label: 'Analytics', icon: TrendingUp }
           ].map(tab => (
             <button
@@ -954,8 +972,8 @@ export default function AdmissionsManagement() {
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="">Select Class</option>
-                {classes.map(cls => (
-                  <option key={cls.id} value={cls.id}>{cls.grade}</option>
+                {GRADE_LEVELS.map(grade => (
+                  <option key={grade} value={grade}>{grade}</option>
                 ))}
               </select>
             </div>
