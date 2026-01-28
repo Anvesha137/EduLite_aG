@@ -39,7 +39,7 @@ type View = 'dashboard' | 'students' | 'educators' | 'attendance' | 'exams' | 'f
 const STORAGE_KEY = 'admin_current_view';
 
 export function AdminDashboard() {
-  const { schoolId } = useSchool();
+  const { schoolId, loading: schoolLoading } = useSchool();
   const [currentView, setCurrentView] = useState<View>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     return (saved as View) || 'dashboard';
@@ -53,8 +53,10 @@ export function AdminDashboard() {
   useEffect(() => {
     if (schoolId) {
       loadData();
+    } else if (!schoolLoading && !schoolId) {
+      setLoading(false);
     }
-  }, [schoolId]);
+  }, [schoolId, schoolLoading]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, currentView);

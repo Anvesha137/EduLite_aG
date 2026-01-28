@@ -7,7 +7,7 @@ import { Modal } from '../Modal';
 import { formatDate } from '../../lib/helpers';
 
 export function ExamManagement() {
-  const { schoolId } = useSchool();
+  const { schoolId, loading: schoolLoading } = useSchool();
   const [exams, setExams] = useState<Exam[]>([]);
   const [classes, setClasses] = useState<Class[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -20,8 +20,10 @@ export function ExamManagement() {
   useEffect(() => {
     if (schoolId) {
       loadData();
+    } else if (!schoolLoading && !schoolId) {
+      setLoading(false);
     }
-  }, [schoolId]);
+  }, [schoolId, schoolLoading]);
 
   const loadData = async () => {
     try {
@@ -93,9 +95,8 @@ export function ExamManagement() {
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-2">
                   <h3 className="text-lg font-bold text-slate-900">{exam.name}</h3>
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    exam.is_published ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
-                  }`}>
+                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${exam.is_published ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
+                    }`}>
                     {exam.is_published ? 'Published' : 'Draft'}
                   </span>
                   <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
@@ -136,11 +137,10 @@ export function ExamManagement() {
                 </button>
                 <button
                   onClick={() => togglePublish(exam)}
-                  className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
-                    exam.is_published
+                  className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${exam.is_published
                       ? 'bg-amber-50 hover:bg-amber-100 text-amber-700'
                       : 'bg-green-50 hover:bg-green-100 text-green-700'
-                  }`}
+                    }`}
                 >
                   {exam.is_published ? 'Unpublish' : 'Publish'}
                 </button>

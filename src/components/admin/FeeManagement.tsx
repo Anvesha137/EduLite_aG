@@ -34,7 +34,7 @@ interface InstallmentData {
 }
 
 export function FeeManagement() {
-  const { schoolId } = useSchool();
+  const { schoolId, loading: schoolLoading } = useSchool();
   const userId = 'demo-user-id';
   const [studentFees, setStudentFees] = useState<StudentFeeData[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
@@ -54,8 +54,10 @@ export function FeeManagement() {
   useEffect(() => {
     if (schoolId) {
       loadData();
+    } else if (!schoolLoading && !schoolId) {
+      setLoading(false);
     }
-  }, [schoolId, filterClass, filterSection, filterStatus]);
+  }, [schoolId, schoolLoading, filterClass, filterSection, filterStatus]);
 
   const loadData = async () => {
     try {

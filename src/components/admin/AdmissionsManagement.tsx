@@ -59,7 +59,7 @@ interface Class {
 }
 
 export default function AdmissionsManagement() {
-  const { schoolId } = useSchool();
+  const { schoolId, loading: schoolLoading } = useSchool();
   const [userId, setUserId] = useState<string>('');
   const isAdmin = true;
 
@@ -136,11 +136,15 @@ export default function AdmissionsManagement() {
   const GRADE_LEVELS = ['Nursery', 'LKG', 'UKG', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
 
   useEffect(() => {
-    loadData();
-    loadFunnelStages();
-    loadLeadSources();
-    loadClasses();
-  }, []);
+    if (schoolId) {
+      loadData();
+      loadFunnelStages();
+      loadLeadSources();
+      loadClasses();
+    } else if (!schoolLoading && !schoolId) {
+      setLoading(false);
+    }
+  }, [schoolId, schoolLoading]);
 
   const loadLeadSources = async () => {
     const { data, error } = await supabase

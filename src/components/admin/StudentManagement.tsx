@@ -8,7 +8,7 @@ import { CSVUpload } from '../CSVUpload';
 import { formatDate } from '../../lib/helpers';
 
 export function StudentManagement() {
-  const { schoolId } = useSchool();
+  const { schoolId, loading: schoolLoading } = useSchool();
   const [students, setStudents] = useState<Student[]>([]);
   const [classes, setClasses] = useState<Class[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
@@ -24,8 +24,10 @@ export function StudentManagement() {
   useEffect(() => {
     if (schoolId) {
       loadData();
+    } else if (!schoolLoading && !schoolId) {
+      setLoading(false);
     }
-  }, [schoolId]);
+  }, [schoolId, schoolLoading]);
 
   const loadData = async () => {
     try {
@@ -49,7 +51,7 @@ export function StudentManagement() {
 
   const filteredStudents = students.filter(student => {
     const matchesSearch = student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         student.admission_number.toLowerCase().includes(searchTerm.toLowerCase());
+      student.admission_number.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesClass = !filterClass || student.class_id === filterClass;
     const matchesStatus = !filterStatus || student.status === filterStatus;
     return matchesSearch && matchesClass && matchesStatus;
@@ -208,11 +210,10 @@ export function StudentManagement() {
                     {(student as any).parent?.name || '-'}
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                      student.status === 'active' ? 'bg-green-100 text-green-700' :
-                      student.status === 'inactive' ? 'bg-slate-100 text-slate-700' :
-                      'bg-blue-100 text-blue-700'
-                    }`}>
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${student.status === 'active' ? 'bg-green-100 text-green-700' :
+                        student.status === 'inactive' ? 'bg-slate-100 text-slate-700' :
+                          'bg-blue-100 text-blue-700'
+                      }`}>
                       {student.status}
                     </span>
                   </td>
