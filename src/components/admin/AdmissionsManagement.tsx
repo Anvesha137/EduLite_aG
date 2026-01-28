@@ -60,8 +60,18 @@ interface Class {
 
 export default function AdmissionsManagement() {
   const { schoolId } = useSchool();
-  const userId = 'demo-user-id';
+  const [userId, setUserId] = useState<string>('');
   const isAdmin = true;
+
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUserId(user.id);
+      }
+    };
+    getUser();
+  }, []);
 
   const [activeTab, setActiveTab] = useState<'leads' | 'applications' | 'analytics'>('leads');
   const [leads, setLeads] = useState<Lead[]>([]);
@@ -229,6 +239,10 @@ export default function AdmissionsManagement() {
     setSaving(true);
 
     try {
+      if (!userId) {
+        throw new Error('User not authenticated');
+      }
+
       const leadNumber = await generateLeadNumber();
       const firstStage = funnelStages.find(s => s.stage_order === 1);
 
@@ -277,6 +291,10 @@ export default function AdmissionsManagement() {
     setSaving(true);
 
     try {
+      if (!userId) {
+        throw new Error('User not authenticated');
+      }
+
       const { error } = await supabase
         .from('admission_visits')
         .insert({
@@ -437,8 +455,8 @@ export default function AdmissionsManagement() {
               key={tab.id}
               onClick={() => setActiveTab(tab.id as any)}
               className={`flex items-center gap-2 px-4 py-3 border-b-2 transition-colors ${activeTab === tab.id
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-slate-600 hover:text-slate-800'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-slate-600 hover:text-slate-800'
                 }`}
             >
               <tab.icon className="w-4 h-4" />
