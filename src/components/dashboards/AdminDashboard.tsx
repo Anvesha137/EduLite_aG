@@ -21,8 +21,12 @@ import { useSchool } from '../../hooks/useSchool';
 import { StudentManagement } from '../admin/StudentManagement';
 import { EducatorManagement } from '../admin/EducatorManagement';
 import { AttendanceManagement } from '../admin/AttendanceManagement';
-import { ExamManagement } from '../admin/ExamManagement';
+// import { ExamManagement } from '../admin/ExamManagement';
+import { ResultsManagement } from '../admin/results/ResultsManagement';
 import { FeeManagement } from '../admin/FeeManagement';
+
+// ... (keep existing imports)
+
 import { AnnouncementManagement } from '../admin/AnnouncementManagement';
 import { Reports } from '../admin/Reports';
 import { Settings as SettingsPage } from '../admin/Settings';
@@ -84,7 +88,7 @@ export function AdminDashboard() {
     { name: 'Educators', icon: GraduationCap, active: currentView === 'educators', onClick: () => setCurrentView('educators') },
     { name: 'Admissions', icon: UserPlus, active: currentView === 'admissions', onClick: () => setCurrentView('admissions') },
     { name: 'Attendance', icon: UserCheck, active: currentView === 'attendance', onClick: () => setCurrentView('attendance') },
-    { name: 'Exams', icon: BookOpen, active: currentView === 'exams', onClick: () => setCurrentView('exams') },
+    { name: 'Results & Exams', icon: BookOpen, active: currentView === 'exams', onClick: () => setCurrentView('exams') },
     { name: 'Fees', icon: DollarSign, active: currentView === 'fees', onClick: () => setCurrentView('fees') },
     { name: 'ID Cards', icon: CreditCard, active: currentView === 'idcards', onClick: () => setCurrentView('idcards') },
     { name: 'Certificates', icon: Award, active: currentView === 'certificates', onClick: () => setCurrentView('certificates') },
@@ -255,7 +259,7 @@ export function AdminDashboard() {
           {currentView === 'educators' && <EducatorManagement />}
           {currentView === 'admissions' && <AdmissionsManagement />}
           {currentView === 'attendance' && <AttendanceManagement />}
-          {currentView === 'exams' && <ExamManagement />}
+          {currentView === 'exams' && <ResultsManagement />}
           {currentView === 'fees' && <FeeManagement />}
           {currentView === 'idcards' && <IDCardManagement />}
           {currentView === 'certificates' && <CertificateManagement />}

@@ -105,8 +105,17 @@ export default function AdmissionsManagement() {
     priority: 'medium',
     notes: '',
     previous_school: '',
-    address: ''
+    address: '',
+    referral_code: '',
+    referral_type: 'student' as 'student' | 'staff' | 'other'
   });
+
+  const [referralValidation, setReferralValidation] = useState<{
+    valid: boolean;
+    name?: string;
+    details?: string;
+    message?: string;
+  } | null>(null);
 
   const [visitForm, setVisitForm] = useState({
     visit_type: 'phone_call',
@@ -234,6 +243,23 @@ export default function AdmissionsManagement() {
     }
   };
 
+  const validateReferral = async () => {
+    if (!leadForm.referral_code || !leadForm.referral_type) return;
+
+    try {
+      const { data, error } = await supabase.rpc('validate_referral_code', {
+        p_code: leadForm.referral_code,
+        p_type: leadForm.referral_type,
+        p_school_id: schoolId
+      });
+
+      if (error) throw error;
+      setReferralValidation(data);
+    } catch (err: any) {
+      setReferralValidation({ valid: false, message: err.message });
+    }
+  };
+
   const handleCreateLead = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
@@ -267,6 +293,8 @@ export default function AdmissionsManagement() {
           notes: leadForm.notes || null,
           previous_school: leadForm.previous_school || null,
           address: leadForm.address || null,
+          referral_code: leadForm.referral_code || null,
+          referral_type: leadForm.referral_type || null,
           created_by: userId,
           updated_by: userId
         })
@@ -362,8 +390,11 @@ export default function AdmissionsManagement() {
       priority: 'medium',
       notes: '',
       previous_school: '',
-      address: ''
+      address: '',
+      referral_code: '',
+      referral_type: 'student'
     });
+    setReferralValidation(null);
   };
 
   const resetVisitForm = () => {
@@ -929,38 +960,108 @@ export default function AdmissionsManagement() {
               </select>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Lead Source *
-              </label>
-              <select
-                required
-                value={leadForm.lead_source_id}
-                onChange={(e) => setLeadForm({ ...leadForm, lead_source_id: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="">Select Source</option>
-                {leadSources.map(source => (
-                  <option key={source.id} value={source.id}>{source.name}</option>
-                ))}
-              </select>
+            <div className="col-span-1 md:col-span-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Lead Source *
+                  </label>
+                  <select
+                    required
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    value={leadForm.lead_source_id}
+                    onChange={(e) => setLeadForm({ ...leadForm, lead_source_id: e.target.value })}
+                  >
+                    <option value="">Select Source</option>
+                    {leadSources.map((source) => (
+                      <option key={source.id} value={source.id}>
+                        {source.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                    Priority
+                  </label>
+                  <select
+                    value={leadForm.priority}
+                    onChange={(e) => setLeadForm({ ...leadForm, priority: e.target.value })}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="urgent">Urgent</option>
+                  </select>
+                </div>
+              </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Priority
-              </label>
-              <select
-                value={leadForm.priority}
-                onChange={(e) => setLeadForm({ ...leadForm, priority: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="urgent">Urgent</option>
-              </select>
-            </div>
+            {leadSources.find(s => s.id === leadForm.lead_source_id)?.name === 'Student/Staff Referral' && (
+              <div className="col-span-1 md:col-span-2 bg-slate-50 p-4 rounded-lg border border-slate-200">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      Referral Type
+                    </label>
+                    <div className="flex gap-4 mt-2">
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name="referralType"
+                          value="student"
+                          checked={leadForm.referral_type === 'student'}
+                          onChange={() => setLeadForm({ ...leadForm, referral_type: 'student' as any, referral_code: '', })}
+                        />
+                        <span className="text-sm">Student</span>
+                      </label>
+                      <label className="flex items-center gap-2">
+                        <input
+                          type="radio"
+                          name="referralType"
+                          value="staff"
+                          checked={leadForm.referral_type === 'staff'}
+                          onChange={(e) => setLeadForm({ ...leadForm, referral_type: 'staff' as any, referral_code: '', })}
+                        />
+                        <span className="text-sm">Staff</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
+                      {leadForm.referral_type === 'student' ? 'Admission Number' : 'Employee ID'}
+                    </label>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        className="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        value={leadForm.referral_code}
+                        onChange={(e) => setLeadForm({ ...leadForm, referral_code: e.target.value })}
+                        onBlur={validateReferral}
+                        placeholder={leadForm.referral_type === 'student' ? 'e.g. ADM001' : 'e.g. EMP001'}
+                      />
+                      <button
+                        type="button"
+                        onClick={validateReferral}
+                        className="px-3 py-1 bg-indigo-50 text-indigo-600 text-xs font-medium rounded-lg hover:bg-indigo-100 border border-indigo-200"
+                      >
+                        Verify
+                      </button>
+                    </div>
+                    {referralValidation && (
+                      <p className={`text-xs mt-1 ${referralValidation.valid ? 'text-green-600' : 'text-red-600'}`}>
+                        {referralValidation.valid
+                          ? `Verified: ${referralValidation.name} (${referralValidation.details})`
+                          : referralValidation.message}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
@@ -1028,8 +1129,8 @@ export default function AdmissionsManagement() {
               Cancel
             </button>
           </div>
-        </form>
-      </Modal>
+        </form >
+      </Modal >
 
       <Modal
         isOpen={showVisitModal}
@@ -1241,6 +1342,6 @@ export default function AdmissionsManagement() {
           </div>
         </form>
       </Modal>
-    </div>
+    </div >
   );
 }
