@@ -149,7 +149,20 @@ function ScheduleExamModal({ isOpen, onClose, schoolId, onSave }: any) {
             supabase.from('exam_types').select('*').eq('school_id', schoolId),
             supabase.from('classes').select('*').eq('school_id', schoolId).order('grade_order')
         ]);
-        if (typesRes.data) setTypes(typesRes.data);
+
+        // Handle Exam Types with Fallback
+        if (typesRes.data && typesRes.data.length > 0) {
+            setTypes(typesRes.data);
+        } else {
+            // Fallback for empty data or error
+            setTypes([
+                { id: '1', name: 'Unit Test', code: 'UT', school_id: schoolId },
+                { id: '2', name: 'Half Yearly', code: 'HY', school_id: schoolId },
+                { id: '3', name: 'Annual', code: 'ANN', school_id: schoolId },
+                { id: '4', name: 'Quarterly', code: 'QT', school_id: schoolId }
+            ]);
+        }
+
         if (classesRes.data) setClasses(classesRes.data);
     };
 
