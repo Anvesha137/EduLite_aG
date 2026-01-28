@@ -211,8 +211,8 @@ export function StudentManagement() {
                   </td>
                   <td className="px-6 py-4">
                     <span className={`px-3 py-1 rounded-full text-xs font-medium ${student.status === 'active' ? 'bg-green-100 text-green-700' :
-                        student.status === 'inactive' ? 'bg-slate-100 text-slate-700' :
-                          'bg-blue-100 text-blue-700'
+                      student.status === 'inactive' ? 'bg-slate-100 text-slate-700' :
+                        'bg-blue-100 text-blue-700'
                       }`}>
                       {student.status}
                     </span>
@@ -349,7 +349,20 @@ function StudentForm({ isOpen, onClose, student, classes, sections, parents, onS
         const { error } = await supabase.from('students').update(studentData).eq('id', student.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('students').insert(studentData);
+        const { error } = await supabase.rpc('create_student', {
+          p_school_id: schoolId,
+          p_admission_number: studentData.admission_number,
+          p_name: studentData.name,
+          p_dob: studentData.dob,
+          p_gender: studentData.gender,
+          p_class_id: studentData.class_id,
+          p_section_id: studentData.section_id,
+          p_parent_id: studentData.parent_id,
+          p_blood_group: studentData.blood_group,
+          p_address: studentData.address,
+          p_admission_date: studentData.admission_date,
+          p_status: studentData.status
+        });
         if (error) throw error;
       }
 

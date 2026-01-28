@@ -371,11 +371,42 @@ function ManageSubjectsModal({ isOpen, onClose, exam, schoolId }: any) {
         setLoading(true);
         try {
             // 1. Get all subjects for the school using Secure RPC
-            const { data: allSubjects, error: subjectsError } = await supabase.rpc('get_available_subjects', {
+            let { data: allSubjects, error: subjectsError } = await supabase.rpc('get_available_subjects', {
                 p_school_id: schoolId
             });
 
             if (subjectsError) throw subjectsError;
+
+            // --- LAZY SEEDING START ---
+            // If no subjects found, seed them immediately for this school
+            if (!allSubjects || allSubjects.length === 0) {
+                console.log('No subjects found. Seeding defaults...');
+                const defaultSubjects = [
+                    { name: 'English', code: 'ENG' },
+                    { name: 'Mathematics', code: 'MATH' },
+                    { name: 'Science', code: 'SCI' },
+                    { name: 'Social Science', code: 'SST' },
+                    { name: 'Hindi', code: 'HIN' },
+                    { name: 'Computer Science', code: 'CS' }
+                ];
+
+                // Create each subject sequentially
+                for (const sub of defaultSubjects) {
+                    await supabase.rpc('create_subject', {
+                        p_school_id: schoolId,
+                        p_name: sub.name,
+                        p_code: sub.code,
+                        p_description: 'Default Subject'
+                    });
+                }
+
+                // Re-fetch after seeding
+                const { data: refreshedSubjects } = await supabase.rpc('get_available_subjects', {
+                    p_school_id: schoolId
+                });
+                allSubjects = refreshedSubjects;
+            }
+            // --- LAZY SEEDING END ---
 
             // 2. Get existing exam subjects
             const { data: existing, error: existingError } = await supabase

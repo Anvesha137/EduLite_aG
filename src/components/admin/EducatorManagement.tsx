@@ -41,7 +41,7 @@ export function EducatorManagement() {
 
   const filteredEducators = educators.filter(educator => {
     const matchesSearch = educator.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         educator.employee_id.toLowerCase().includes(searchTerm.toLowerCase());
+      educator.employee_id.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = !filterStatus || educator.status === filterStatus;
     return matchesSearch && matchesStatus;
   });
@@ -179,11 +179,10 @@ export function EducatorManagement() {
                   <td className="px-6 py-4 text-sm text-slate-600">{educator.phone}</td>
                   <td className="px-6 py-4 text-sm text-slate-600">{educator.experience_years} years</td>
                   <td className="px-6 py-4">
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                      educator.status === 'active' ? 'bg-green-100 text-green-700' :
-                      educator.status === 'inactive' ? 'bg-slate-100 text-slate-700' :
-                      'bg-red-100 text-red-700'
-                    }`}>
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${educator.status === 'active' ? 'bg-green-100 text-green-700' :
+                        educator.status === 'inactive' ? 'bg-slate-100 text-slate-700' :
+                          'bg-red-100 text-red-700'
+                      }`}>
                       {educator.status}
                     </span>
                   </td>
@@ -307,7 +306,19 @@ function EducatorForm({ isOpen, onClose, educator, onSave, schoolId }: EducatorF
         const { error } = await supabase.from('educators').update(educatorData).eq('id', educator.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from('educators').insert(educatorData);
+        const { error } = await supabase.rpc('create_educator', {
+          p_school_id: schoolId,
+          p_employee_id: educatorData.employee_id,
+          p_name: educatorData.name,
+          p_phone: educatorData.phone,
+          p_email: educatorData.email,
+          p_designation: educatorData.designation,
+          p_qualification: educatorData.qualification,
+          p_experience_years: educatorData.experience_years,
+          p_joining_date: educatorData.joining_date,
+          p_status: educatorData.status,
+          p_address: educatorData.address
+        });
         if (error) throw error;
       }
 
