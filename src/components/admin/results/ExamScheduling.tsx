@@ -22,10 +22,14 @@ export function ExamScheduling() {
     const [showModal, setShowModal] = useState(false);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
 
+    const [selectedExam, setSelectedExam] = useState<ExamSchedule | null>(null);
+    const [showSubjectsModal, setShowSubjectsModal] = useState(false);
+
     useEffect(() => {
         if (schoolId) loadExams();
     }, [schoolId, refreshTrigger]);
 
+    // ... (rest of loadExams and helpers)
     const loadExams = async () => {
         try {
             // Fetch exams using Secure RPC
@@ -106,7 +110,13 @@ export function ExamScheduling() {
                                 </div>
                             </div>
                             <div className="flex items-center gap-2">
-                                <button className="px-3 py-1.5 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg flex items-center gap-1">
+                                <button
+                                    onClick={() => {
+                                        setSelectedExam(exam);
+                                        setShowSubjectsModal(true);
+                                    }}
+                                    className="px-3 py-1.5 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg flex items-center gap-1"
+                                >
                                     Manage Subjects <ArrowRight className="w-4 h-4" />
                                 </button>
                             </div>
@@ -125,6 +135,13 @@ export function ExamScheduling() {
                 onClose={() => setShowModal(false)}
                 schoolId={schoolId}
                 onSave={() => setRefreshTrigger(p => p + 1)}
+            />
+
+            <ManageSubjectsModal
+                isOpen={showSubjectsModal}
+                onClose={() => setShowSubjectsModal(false)}
+                exam={selectedExam}
+                schoolId={schoolId}
             />
         </div>
     );
@@ -330,6 +347,123 @@ function ScheduleExamModal({ isOpen, onClose, schoolId, onSave }: any) {
                             {loading ? 'Creating...' : 'Create Schedule'} <CheckCircle className="w-4 h-4" />
                         </button>
                     )}
+                </div>
+            </div>
+        </Modal>
+    );
+}
+
+function ManageSubjectsModal({ isOpen, onClose, exam, schoolId }: any) {
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [subjects, setSubjects] = useState<any[]>([]);
+    const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
+
+
+
+    useEffect(() => {
+        if (isOpen && exam) {
+            loadSubjects();
+        }
+    }, [isOpen, exam]);
+
+    const loadSubjects = async () => {
+        setLoading(true);
+        try {
+            // 1. Get all subjects for the school using Secure RPC
+            const { data: allSubjects, error: subjectsError } = await supabase.rpc('get_available_subjects', {
+                p_school_id: schoolId
+            });
+
+            if (subjectsError) throw subjectsError;
+
+            // 2. Get existing exam subjects
+            const { data: existing, error: existingError } = await supabase
+                .from('exam_subjects')
+                .select('subject_id')
+                .eq('exam_id', exam.id);
+
+            if (existingError) throw existingError;
+
+            setSubjects(allSubjects || []);
+            setSelectedSubjects(existing?.map(e => e.subject_id) || []);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const toggleSubject = (id: string) => {
+        setSelectedSubjects(prev =>
+            prev.includes(id) ? prev.filter(s => s !== id) : [...prev, id]
+        );
+    };
+
+    const handleSave = async () => {
+        setSaving(true);
+        try {
+            // Delete all existing
+            await supabase.from('exam_subjects').delete().eq('exam_id', exam.id);
+
+            // Insert new
+            if (selectedSubjects.length > 0) {
+                const { error } = await supabase.from('exam_subjects').insert(
+                    selectedSubjects.map(sid => ({
+                        exam_id: exam.id,
+                        subject_id: sid,
+                        school_id: schoolId,
+                        max_marks: 100 // Default, can be editable later
+                    }))
+                );
+                if (error) throw error;
+            }
+            alert('Subjects updated successfully!');
+            onClose();
+        } catch (err: any) {
+            alert('Error saving subjects: ' + err.message);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <Modal isOpen={isOpen} onClose={onClose} title={`Manage Subjects: ${exam?.name}`} size="lg">
+            <div className="space-y-6">
+                <div className="p-4 bg-blue-50 text-blue-800 rounded-lg text-sm">
+                    Select the subjects applicable for this exam. These will appear in the Marks Entry screen.
+                </div>
+
+                {loading ? (
+                    <div className="text-center py-8">Loading subjects...</div>
+                ) : (
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3 max-h-96 overflow-y-auto">
+                        {subjects.map(sub => (
+                            <div
+                                key={sub.id}
+                                onClick={() => toggleSubject(sub.id)}
+                                className={`p-3 rounded-lg border cursor-pointer transition-all ${selectedSubjects.includes(sub.id)
+                                    ? 'border-blue-600 bg-blue-50 text-blue-700 ring-1 ring-blue-600'
+                                    : 'border-slate-200 hover:border-blue-400'
+                                    }`}
+                            >
+                                <div className="font-semibold">{sub.name}</div>
+                                <div className="text-xs text-slate-500">{sub.code}</div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                <div className="flex justify-end pt-4 border-t border-slate-100">
+                    <button
+                        onClick={handleSave}
+                        disabled={saving}
+                        className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
+                    >
+                        {saving ? 'Saving...' : 'Save Subjects'}
+                    </button>
                 </div>
             </div>
         </Modal>
