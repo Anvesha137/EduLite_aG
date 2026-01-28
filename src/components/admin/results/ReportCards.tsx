@@ -26,6 +26,7 @@ export function ReportCards() {
 
     useEffect(() => {
         if (selectedExamId) loadClasses(selectedExamId);
+        else { setClasses([]); setSelectedClassId(''); }
     }, [selectedExamId]);
 
     useEffect(() => {
@@ -34,35 +35,39 @@ export function ReportCards() {
     }, [selectedExamId, selectedClassId]);
 
     const loadExams = async () => {
-        const { data } = await supabase.from('exam_schedules').select('id, name').eq('school_id', schoolId).neq('status', 'draft').order('start_date', { ascending: false });
-        if (data) setExams(data);
+        try {
+            const { data, error } = await supabase.rpc('get_exam_schedules', { p_school_id: schoolId });
+            if (error) throw error;
+            if (data) setExams(data);
+        } catch (err) {
+            console.error('Error loading exams:', err);
+        }
     };
 
     const loadClasses = async (examId: string) => {
-        const { data } = await supabase.from('exam_classes').select('class:classes(id, grade)').eq('exam_id', examId);
-        if (data) setClasses(data.map((d: any) => d.class).sort((a: any, b: any) => a.grade.localeCompare(b.grade)));
+        try {
+            const { data, error } = await supabase.rpc('get_exam_classes', { p_exam_id: examId });
+            if (error) throw error;
+            if (data) setClasses(data);
+        } catch (err) {
+            console.error('Error loading classes:', err);
+        }
     };
 
     const loadResults = async () => {
         setLoading(true);
         try {
-            // Fetch students with their result summaries
-            // We need to join students with result_summaries
-            const { data: studentsData } = await supabase
-                .from('students')
-                .select(`
-          id, name, admission_number,
-          result_summaries!inner(total_marks_obtained, total_max_marks, percentage, grade)
-        `)
-                .eq('school_id', schoolId)
-                .eq('class_id', selectedClassId)
-                .eq('status', 'active')
-                .eq('result_summaries.exam_id', selectedExamId)
-                .order('name');
+            // Using Secure RPC to fetch summary grid
+            const { data, error } = await supabase.rpc('get_exam_results_summary', {
+                p_school_id: schoolId,
+                p_exam_id: selectedExamId,
+                p_class_id: selectedClassId
+            });
 
-            setResults(studentsData || []);
+            if (error) throw error;
+            setResults(data || []);
         } catch (err) {
-            console.error(err);
+            console.error('Error loading results:', err);
         } finally {
             setLoading(false);
         }
@@ -72,6 +77,7 @@ export function ReportCards() {
         if (!confirm('This will calculate totals and grades for all students in this exam. Continue?')) return;
         setProcessing(true);
         try {
+            // Secure RPC for calculation
             const { error } = await supabase.rpc('process_exam_results', { p_exam_id: selectedExamId });
             if (error) throw error;
             alert('Results processed successfully!');
@@ -83,24 +89,28 @@ export function ReportCards() {
         }
     };
 
-    const viewReportCard = async (student: any) => {
+    const viewReportCard = async (studentId: string) => {
         setLoading(true);
-        // Fetch detailed subject marks for this student
-        const { data: details } = await supabase
-            .from('student_marks')
-            .select(`
-        marks_obtained, max_marks, remarks, is_absent,
-        subject:subjects(name)
-      `)
-            .eq('exam_id', selectedExamId)
-            .eq('student_id', student.id);
+        try {
+            // Fetch detailed report card via RPC
+            const { data, error } = await supabase.rpc('get_student_report_card', {
+                p_exam_id: selectedExamId,
+                p_student_id: studentId
+            });
 
-        setSelectedStudent({
-            ...student,
-            details: details || []
-        });
-        setLoading(false);
-        setShowReportModal(true);
+            if (error) throw error;
+
+            // RPC returns an array (likely 1 row per student) containing the full JSON structure
+            if (data && data.length > 0) {
+                setSelectedStudent(data[0]);
+                setShowReportModal(true);
+            }
+        } catch (err) {
+            console.error(err);
+            alert('Failed to load report card.');
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -126,7 +136,7 @@ export function ReportCards() {
                         disabled={!selectedExamId}
                     >
                         <option value="">Choose Class...</option>
-                        {classes.map(c => <option key={c.id} value={c.id}>{c.grade}</option>)}
+                        {classes.map(c => <option key={c.class_id} value={c.class_id}>{c.grade}</option>)}
                     </select>
                 </div>
                 <div>
@@ -162,33 +172,30 @@ export function ReportCards() {
                                 {loading ? 'Loading...' : 'No results found. Try clicking "Calculate Results" if you have entered marks.'}
                             </td></tr>
                         ) : (
-                            results.map(student => {
-                                const summary = student.result_summaries[0];
-                                return (
-                                    <tr key={student.id} className="hover:bg-slate-50">
-                                        <td className="px-6 py-4">
-                                            <div className="font-medium text-slate-900">{student.name}</div>
-                                            <div className="text-xs text-slate-500">{student.admission_number}</div>
-                                        </td>
-                                        <td className="px-6 py-4">{summary?.total_marks_obtained} / {summary?.total_max_marks}</td>
-                                        <td className="px-6 py-4">{Number(summary?.percentage).toFixed(2)}%</td>
-                                        <td className="px-6 py-4">
-                                            <span className={`px-2 py-1 rounded text-xs font-bold ${summary?.grade === 'F' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
-                                                }`}>
-                                                {summary?.grade || '-'}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <button
-                                                onClick={() => viewReportCard(student)}
-                                                className="text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1 ml-auto"
-                                            >
-                                                <Eye className="w-4 h-4" /> View Report
-                                            </button>
-                                        </td>
-                                    </tr>
-                                );
-                            })
+                            results.map(student => (
+                                <tr key={student.student_id} className="hover:bg-slate-50">
+                                    <td className="px-6 py-4">
+                                        <div className="font-medium text-slate-900">{student.student_name}</div>
+                                        <div className="text-xs text-slate-500">{student.admission_number}</div>
+                                    </td>
+                                    <td className="px-6 py-4">{student.total_obtained || 0} / {student.total_max || 0}</td>
+                                    <td className="px-6 py-4">{Number(student.percentage || 0).toFixed(2)}%</td>
+                                    <td className="px-6 py-4">
+                                        <span className={`px-2 py-1 rounded text-xs font-bold ${student.grade === 'F' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+                                            }`}>
+                                            {student.grade || '-'}
+                                        </span>
+                                    </td>
+                                    <td className="px-6 py-4 text-right">
+                                        <button
+                                            onClick={() => viewReportCard(student.student_id)}
+                                            className="text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1 ml-auto"
+                                        >
+                                            <Eye className="w-4 h-4" /> View Report
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))
                         )}
                     </tbody>
                 </table>
@@ -198,29 +205,29 @@ export function ReportCards() {
                 isOpen={showReportModal}
                 onClose={() => setShowReportModal(false)}
                 student={selectedStudent}
-                examName={exams.find(e => e.id === selectedExamId)?.name}
             />
         </div>
     );
 }
 
-function ReportCardModal({ isOpen, onClose, student, examName }: any) {
+function ReportCardModal({ isOpen, onClose, student }: any) {
     if (!student) return null;
 
-    const summary = student.result_summaries[0];
+    // Student object comes from get_student_report_card RPC
+    // structure: { student_name, admission_number, exam_name, total_obtained, total_max, percentage, grade, subject_details: [...] }
 
     return (
         <Modal isOpen={isOpen} onClose={onClose} title="Student Report Card" size="lg">
             <div className="space-y-6" id="printable-report">
                 <div className="text-center border-b pb-4">
                     <h2 className="text-xl font-bold text-slate-900">EduLite High School</h2>
-                    <p className="text-slate-500">Official Report Card - {examName}</p>
+                    <p className="text-slate-500">Official Report Card - {student.exam_name}</p>
                 </div>
 
                 <div className="flex justify-between text-sm">
                     <div>
                         <p className="text-slate-500">Student Name</p>
-                        <p className="font-bold text-slate-900">{student.name}</p>
+                        <p className="font-bold text-slate-900">{student.student_name}</p>
                     </div>
                     <div>
                         <p className="text-slate-500">Admission No</p>
@@ -242,9 +249,9 @@ function ReportCardModal({ isOpen, onClose, student, examName }: any) {
                         </tr>
                     </thead>
                     <tbody>
-                        {student.details?.map((detail: any, idx: number) => (
+                        {student.subject_details?.map((detail: any, idx: number) => (
                             <tr key={idx}>
-                                <td className="border border-slate-200 px-4 py-2 font-medium">{detail.subject?.name}</td>
+                                <td className="border border-slate-200 px-4 py-2 font-medium">{detail.subject_name}</td>
                                 <td className="border border-slate-200 px-4 py-2 text-center">{detail.max_marks}</td>
                                 <td className="border border-slate-200 px-4 py-2 text-center">
                                     {detail.is_absent ? <span className="text-red-600">Abs</span> : detail.marks_obtained}
@@ -256,10 +263,10 @@ function ReportCardModal({ isOpen, onClose, student, examName }: any) {
                     <tfoot className="bg-slate-50 font-bold">
                         <tr>
                             <td className="border border-slate-200 px-4 py-2">Total</td>
-                            <td className="border border-slate-200 px-4 py-2 text-center">{summary?.total_max_marks}</td>
-                            <td className="border border-slate-200 px-4 py-2 text-center">{summary?.total_marks_obtained}</td>
+                            <td className="border border-slate-200 px-4 py-2 text-center">{student.total_max}</td>
+                            <td className="border border-slate-200 px-4 py-2 text-center">{student.total_obtained}</td>
                             <td className="border border-slate-200 px-4 py-2">
-                                {Number(summary?.percentage).toFixed(2)}% ({summary?.grade})
+                                {Number(student.percentage).toFixed(2)}% ({student.grade})
                             </td>
                         </tr>
                     </tfoot>

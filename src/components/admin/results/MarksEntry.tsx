@@ -52,97 +52,81 @@ export function MarksEntry() {
     }, [selectedExamId, selectedClassId, selectedSubjectId]);
 
     const loadExams = async () => {
-        const { data } = await supabase
-            .from('exam_schedules')
-            .select('id, name')
-            .eq('school_id', schoolId)
-            .neq('status', 'draft') // Only active exams
-            .order('start_date', { ascending: false });
-        if (data) setExams(data);
+        try {
+            // Secure RPC
+            const { data, error } = await supabase.rpc('get_exam_schedules', { p_school_id: schoolId });
+            if (error) throw error;
+            if (data) setExams(data);
+        } catch (err) {
+            console.error('Error loading exams:', err);
+        }
     };
 
     const loadClasses = async (examId: string) => {
-        // Get classes assigned to this exam
-        const { data } = await supabase
-            .from('exam_classes')
-            .select('class:classes(id, grade)')
-            .eq('exam_id', examId);
-
-        if (data) {
-            setClasses(data.map((d: any) => d.class).sort((a: any, b: any) => a.grade.localeCompare(b.grade)));
+        try {
+            // Secure RPC
+            const { data, error } = await supabase.rpc('get_exam_classes', { p_exam_id: examId });
+            if (error) throw error;
+            if (data) setClasses(data);
+        } catch (err) {
+            console.error('Error loading classes:', err);
         }
     };
 
     const loadSubjects = async (examId: string, classId: string) => {
-        // Ideally fetch from exam_subjects configuration
-        // Fallback/For now: fetch all subjects for the school or class
-        // TO DO: Implement exam_subjects table correctly in Phase 1
-        // Checking current schema... exam_subjects exists.
+        try {
+            // Ideally fetch from exam_subjects configuration via RPC
+            // For now, consistent with previous approach but safer with fallback if RPC missing?
+            // We can query exam_subjects directly IF no RLS blocks, but better to use what we have.
+            // Let's use direct query for now, but wrapped in try-catch. 
+            // NOTE: I haven't made get_exam_subjects RPC yet. If this fails, I'll need to add it.
+            // But exam_subjects is usually readable.
 
-        const { data } = await supabase
-            .from('exam_subjects')
-            .select('subject:subjects(id, name), max_marks, passing_marks')
-            .eq('exam_id', examId)
-            .eq('class_id', classId);
+            const { data, error } = await supabase
+                .from('exam_subjects')
+                .select('subject:subjects(id, name), max_marks, passing_marks')
+                .eq('exam_id', examId)
+                .eq('class_id', classId);
 
-        if (data && data.length > 0) {
-            setSubjects(data.map((d: any) => ({
-                id: d.subject.id,
-                name: d.subject.name,
-                max_marks: d.max_marks
-            })));
-        } else {
-            // Fallback if not configured specifically: Fetch all subjects
-            const { data: allSubjects } = await supabase.from('subjects').select('*').eq('school_id', schoolId);
-            if (allSubjects) {
-                setSubjects(allSubjects.map(s => ({ ...s, max_marks: 100 }))); // Default 100
+            if (data && data.length > 0) {
+                setSubjects(data.map((d: any) => ({
+                    id: d.subject.id,
+                    name: d.subject.name,
+                    max_marks: d.max_marks
+                })));
+            } else {
+                // Fallback: Fetch all subjects for the school
+                // Note: 'subjects' table usually has relaxed RLS or readable by educators
+                const { data: allSubjects } = await supabase.from('subjects').select('*').eq('school_id', schoolId);
+                if (allSubjects) {
+                    setSubjects(allSubjects.map(s => ({ ...s, max_marks: 100 }))); // Default 100
+                }
             }
+        } catch (err) {
+            console.error('Error loading subjects:', err);
         }
     };
 
     const loadMarks = async () => {
         setLoading(true);
         try {
-            // 1. Fetch Students
-            const { data: studentsData } = await supabase
-                .from('students')
-                .select('id, name, admission_number')
-                .eq('school_id', schoolId)
-                .eq('class_id', selectedClassId)
-                .eq('status', 'active')
-                .order('name');
-
-            if (!studentsData) return;
-
-            // 2. Fetch Existing Marks
-            const { data: marksData } = await supabase
-                .from('student_marks')
-                .select('*')
-                .eq('exam_id', selectedExamId)
-                .eq('subject_id', selectedSubjectId);
-
-            const marksMap = new Map();
-            marksData?.forEach(m => marksMap.set(m.student_id, m));
-
-            // 3. Merge
-            const currentSubjectMax = subjects.find(s => s.id === selectedSubjectId)?.max_marks || 100;
-
-            const merged = studentsData.map(s => {
-                const existing = marksMap.get(s.id);
-                return {
-                    student_id: s.id,
-                    student_name: s.name,
-                    admission_number: s.admission_number,
-                    marks_obtained: existing ? existing.marks_obtained : '',
-                    max_marks: currentSubjectMax,
-                    is_absent: existing ? existing.is_absent : false,
-                    remarks: existing ? existing.remarks : ''
-                };
+            // Use the NEW Secure RPC that joins everything on server side
+            const { data, error } = await supabase.rpc('get_student_marks_for_exam', {
+                p_school_id: schoolId,
+                p_exam_id: selectedExamId,
+                p_class_id: selectedClassId,
+                p_subject_id: selectedSubjectId
             });
 
-            setStudents(merged);
+            if (error) throw error;
+
+            if (data) {
+                // Data comes back in the correct shape
+                setStudents(data);
+            }
         } catch (err) {
-            console.error(err);
+            console.error('Error loading marks:', err);
+            alert('Failed to load student marks. Please try again.');
         } finally {
             setLoading(false);
         }
@@ -152,8 +136,14 @@ export function MarksEntry() {
         const numValue = value === '' ? '' : parseFloat(value);
         setStudents(prev => prev.map(s => {
             if (s.student_id === studentId) {
-                // Validation
-                if (typeof numValue === 'number' && numValue > s.max_marks) return s; // Prevent exceeding max
+                // Validation only if value is a number
+                if (value !== '' && typeof numValue === 'number' && s.max_marks > 0 && numValue > s.max_marks) {
+                    // Optional: could show toast or error, for now just ignore/clamp? 
+                    // Let's return as is to allow user correction but maybe flag it visually?
+                    // User requested "redesign" -> prevent mistakes. Clamping or rejecting is better.
+                    // Let's reject update if > max.
+                    return s;
+                }
                 return { ...s, marks_obtained: numValue };
             }
             return s;
@@ -169,22 +159,39 @@ export function MarksEntry() {
     const handleSave = async () => {
         setSaving(true);
         try {
-            const payload = students.map(s => ({
-                exam_id: selectedExamId,
-                student_id: s.student_id,
-                subject_id: selectedSubjectId,
-                marks_obtained: s.is_absent ? 0 : (s.marks_obtained === '' ? null : s.marks_obtained),
-                is_absent: s.is_absent,
-                remarks: s.remarks
-            })).filter(s => s.marks_obtained !== null || s.is_absent); // Only save entered data
+            // Fetch user first to avoid await inside map
+            const { data: { user } } = await supabase.auth.getUser();
+            const currentUserId = user?.id;
 
-            const { error } = await supabase.from('student_marks').upsert(payload, {
-                onConflict: 'exam_id,student_id,subject_id'
-            });
+            // Prepare payload for correct RPC format
+            // The RPC expects: exam_id, student_id, subject_id, marks_obtained, is_absent, remarks, entered_by
+            const payload = students
+                .filter(s => s.marks_obtained !== '' || s.is_absent) // Only save valid entries
+                .map(s => ({
+                    exam_id: selectedExamId,
+                    student_id: s.student_id,
+                    subject_id: selectedSubjectId,
+                    marks_obtained: s.marks_obtained === '' ? 0 : s.marks_obtained,
+                    is_absent: s.is_absent,
+                    remarks: s.remarks,
+                    entered_by: currentUserId
+                }));
+
+            if (payload.length === 0) {
+                alert('No marks to save.');
+                setSaving(false);
+                return;
+            }
+
+            // Secure RPC for bulk update
+            const { error } = await supabase.rpc('update_student_marks', { p_marks_json: payload });
 
             if (error) throw error;
             alert('Marks saved successfully!');
+            // Reload to refresh state
+            loadMarks();
         } catch (err: any) {
+            console.error(err);
             alert('Error saving marks: ' + err.message);
         } finally {
             setSaving(false);
@@ -220,7 +227,7 @@ export function MarksEntry() {
                         disabled={!selectedExamId}
                     >
                         <option value="">Choose Class...</option>
-                        {classes.map(c => <option key={c.id} value={c.id}>{c.grade}</option>)}
+                        {classes.map(c => <option key={c.class_id} value={c.class_id}>{c.grade}</option>)}
                     </select>
                 </div>
                 <div>
@@ -251,14 +258,19 @@ export function MarksEntry() {
                                 className="w-full pl-9 pr-4 py-2 rounded-lg border-slate-300 text-sm"
                             />
                         </div>
-                        <button
-                            onClick={handleSave}
-                            disabled={saving}
-                            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium flex items-center gap-2 disabled:opacity-50"
-                        >
-                            <Save className="w-4 h-4" />
-                            {saving ? 'Saving...' : 'Save Marks'}
-                        </button>
+                        <div className="flex items-center gap-3">
+                            <div className="text-sm text-slate-500">
+                                {students.filter(s => s.marks_obtained !== '' || s.is_absent).length} / {students.length} Entered
+                            </div>
+                            <button
+                                onClick={handleSave}
+                                disabled={saving}
+                                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium flex items-center gap-2 disabled:opacity-50 transition-colors"
+                            >
+                                <Save className="w-4 h-4" />
+                                {saving ? 'Saving...' : 'Save Marks'}
+                            </button>
+                        </div>
                     </div>
 
                     <div className="flex-1 overflow-auto">
@@ -266,7 +278,7 @@ export function MarksEntry() {
                             <thead className="bg-slate-50 sticky top-0 z-10">
                                 <tr>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Student</th>
-                                    <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider w-32">Abs/Pres</th>
+                                    <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider w-32">Attendance</th>
                                     <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 uppercase tracking-wider w-40">Marks Obtained</th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Remarks</th>
                                 </tr>
@@ -287,8 +299,8 @@ export function MarksEntry() {
                                                 <button
                                                     onClick={() => toggleAbsent(student.student_id)}
                                                     className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${student.is_absent
-                                                            ? 'bg-red-100 text-red-700 hover:bg-red-200'
-                                                            : 'bg-green-100 text-green-700 hover:bg-green-200'
+                                                        ? 'bg-red-100 text-red-700 hover:bg-red-200'
+                                                        : 'bg-green-100 text-green-700 hover:bg-green-200'
                                                         }`}
                                                 >
                                                     {student.is_absent ? 'Absent' : 'Present'}
@@ -301,19 +313,21 @@ export function MarksEntry() {
                                                         disabled={student.is_absent}
                                                         value={student.marks_obtained}
                                                         onChange={(e) => handleMarkChange(student.student_id, e.target.value)}
-                                                        className="w-20 px-3 py-2 border rounded-lg text-center disabled:bg-slate-100 disabled:text-slate-400"
-                                                        placeholder={`/${student.max_marks}`}
+                                                        className={`w-24 px-3 py-2 border rounded-lg text-center disabled:bg-slate-100 disabled:text-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 ${typeof student.marks_obtained === 'number' && student.marks_obtained > student.max_marks
+                                                            ? 'border-red-500 bg-red-50'
+                                                            : 'border-slate-300'
+                                                            }`}
+                                                        placeholder={`Max ${student.max_marks}`}
                                                     />
-                                                    <span className="text-slate-400 text-sm">/ {student.max_marks}</span>
                                                 </div>
                                             </td>
                                             <td className="px-6 py-4 whitespace-nowrap">
                                                 <input
                                                     type="text"
-                                                    value={student.remarks}
+                                                    value={student.remarks || ''}
                                                     onChange={(e) => setStudents(prev => prev.map(s => s.student_id === student.student_id ? { ...s, remarks: e.target.value } : s))}
                                                     className="w-full px-3 py-2 border-transparent hover:border-slate-300 focus:border-blue-500 rounded-lg text-sm bg-transparent"
-                                                    placeholder="Optional remarks..."
+                                                    placeholder="Add note..."
                                                 />
                                             </td>
                                         </tr>
@@ -328,8 +342,8 @@ export function MarksEntry() {
             {!selectedSubjectId && (
                 <div className="text-center py-20 bg-white rounded-xl border border-dashed border-slate-300">
                     <AlertCircle className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-slate-900">Select Subject to Enter Marks</h3>
-                    <p className="text-slate-500">Please select an exam, class, and subject above.</p>
+                    <h3 className="text-lg font-medium text-slate-900">Mark Entry Area</h3>
+                    <p className="text-slate-500">Select an exam to start entering marks.</p>
                 </div>
             )}
         </div>

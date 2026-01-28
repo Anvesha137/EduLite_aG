@@ -16,7 +16,7 @@ interface ExamSchedule {
 }
 
 export function ExamScheduling() {
-    const { schoolId } = useSchool();
+    const { schoolId, loading: schoolLoading } = useSchool();
     const [exams, setExams] = useState<ExamSchedule[]>([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
@@ -28,19 +28,21 @@ export function ExamScheduling() {
 
     const loadExams = async () => {
         try {
-            // Fetch exams with related info
-            const { data, error } = await supabase
-                .from('exam_schedules')
-                .select(`
-          *,
-          exam_type:exam_types(name, code),
-          classes:exam_classes(class:classes(grade))
-        `)
-                .eq('school_id', schoolId)
-                .order('start_date', { ascending: false });
+            // Fetch exams using Secure RPC
+            const { data, error } = await supabase.rpc('get_exam_schedules', { p_school_id: schoolId });
 
             if (error) throw error;
-            setExams(data || []);
+            const mappedExams = (data || []).map((e: any) => ({
+                id: e.id,
+                name: e.name,
+                start_date: e.start_date,
+                end_date: e.end_date,
+                status: e.status,
+                exam_type: { name: e.exam_type_name, code: e.exam_type_code },
+                classes: e.class_grades ? e.class_grades.map((g: string) => ({ class: { grade: g } })) : []
+            }));
+
+            setExams(mappedExams);
         } catch (err) {
             console.error('Error loading exams:', err);
         } finally {
@@ -56,6 +58,14 @@ export function ExamScheduling() {
             default: return 'bg-amber-100 text-amber-700'; // draft
         }
     };
+
+    if (schoolLoading) {
+        return <div className="p-8 text-center text-slate-500">Loading school details...</div>;
+    }
+
+    if (!schoolId) {
+        return <div className="p-8 text-center text-red-500">Error: School ID not found.</div>;
+    }
 
     return (
         <div className="space-y-6">
@@ -113,7 +123,7 @@ export function ExamScheduling() {
             <ScheduleExamModal
                 isOpen={showModal}
                 onClose={() => setShowModal(false)}
-                schoolId={schoolId!}
+                schoolId={schoolId}
                 onSave={() => setRefreshTrigger(p => p + 1)}
             />
         </div>
@@ -156,10 +166,10 @@ function ScheduleExamModal({ isOpen, onClose, schoolId, onSave }: any) {
         } else {
             // Fallback for empty data or error
             setTypes([
-                { id: '1', name: 'Unit Test', code: 'UT', school_id: schoolId },
-                { id: '2', name: 'Half Yearly', code: 'HY', school_id: schoolId },
-                { id: '3', name: 'Annual', code: 'ANN', school_id: schoolId },
-                { id: '4', name: 'Quarterly', code: 'QT', school_id: schoolId }
+                { id: '00000000-0000-0000-0000-000000000001', name: 'Unit Test', code: 'UT', school_id: schoolId },
+                { id: '00000000-0000-0000-0000-000000000002', name: 'Half Yearly', code: 'HY', school_id: schoolId },
+                { id: '00000000-0000-0000-0000-000000000003', name: 'Annual', code: 'ANN', school_id: schoolId },
+                { id: '00000000-0000-0000-0000-000000000004', name: 'Quarterly', code: 'QT', school_id: schoolId }
             ]);
         }
 
@@ -178,28 +188,18 @@ function ScheduleExamModal({ isOpen, onClose, schoolId, onSave }: any) {
     const handleSubmit = async () => {
         setLoading(true);
         try {
-            // 1. Create Exam Schedule
-            const { data: examData, error: examError } = await supabase.from('exam_schedules').insert({
-                school_id: schoolId,
-                name: form.name,
-                exam_type_id: form.exam_type_id,
-                academic_year: form.academic_year,
-                start_date: form.start_date,
-                end_date: form.end_date,
-                status: 'draft'
-            }).select().single();
+            // Atomic RPC call for Exam + Classes
+            const { error } = await supabase.rpc('create_exam_schedule_with_classes', {
+                p_school_id: schoolId,
+                p_name: form.name,
+                p_exam_type_id: form.exam_type_id,
+                p_academic_year: form.academic_year,
+                p_start_date: form.start_date,
+                p_end_date: form.end_date,
+                p_class_ids: form.selectedClassIds
+            });
 
-            if (examError) throw examError;
-
-            // 2. Link Classes
-            if (form.selectedClassIds.length > 0) {
-                const classLinks = form.selectedClassIds.map(classId => ({
-                    exam_id: examData.id,
-                    class_id: classId
-                }));
-                const { error: linkError } = await supabase.from('exam_classes').insert(classLinks);
-                if (linkError) throw linkError;
-            }
+            if (error) throw error;
 
             onSave();
             onClose();
