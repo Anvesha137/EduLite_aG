@@ -154,11 +154,13 @@ function ExamTypeModal({ isOpen, onClose, examType, schoolId, onSave }: any) {
         e.preventDefault();
         setSaving(true);
         try {
+            let error;
             if (examType) {
-                await supabase.from('exam_types').update(form).eq('id', examType.id);
+                ({ error } = await supabase.from('exam_types').update(form).eq('id', examType.id));
             } else {
-                await supabase.from('exam_types').insert({ ...form, school_id: schoolId });
+                ({ error } = await supabase.from('exam_types').insert({ ...form, school_id: schoolId }));
             }
+            if (error) throw error;
             onSave();
             onClose();
         } catch (err: any) {
@@ -348,7 +350,8 @@ function GradeScaleModal({ isOpen, onClose, scale, schoolId, onSave }: any) {
 
             // 1. Save Scale
             if (scale) {
-                await supabase.from('grade_scales').update(form).eq('id', scale.id);
+                const { error: updateError } = await supabase.from('grade_scales').update(form).eq('id', scale.id);
+                if (updateError) throw updateError;
             } else {
                 const { data, error } = await supabase.from('grade_scales').insert({ ...form, school_id: schoolId }).select().single();
                 if (error) throw error;
