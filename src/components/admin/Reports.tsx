@@ -49,8 +49,11 @@ export function Reports() {
       .from('attendance')
       .select(`
         *,
-        students:student_id (name, admission_number, class_id),
-        classes:students!inner(class_id)
+        students:student_id (
+          name, 
+          admission_number, 
+          class:class_id (grade)
+        )
       `)
       .eq('school_id', schoolId)
       .gte('date', startDate)
@@ -78,46 +81,77 @@ export function Reports() {
       .select(`
         *,
         students:student_id (name, admission_number),
-        fee_structures:fee_structure_id (fee_type, amount)
+        installment:installment_id (
+          amount,
+          fee_head:fee_head_id (name)
+        )
       `)
       .eq('school_id', schoolId)
       .gte('payment_date', startDate)
       .lte('payment_date', endDate)
       .order('payment_date', { ascending: false });
 
-    setReportData(feesData || []);
+    // Transform data for display/export
+    const processedData = feesData?.map((t: any) => ({
+      ...t,
+      student_name: t.students?.name,
+      admission_number: t.students?.admission_number,
+      fee_type: t.installment?.fee_head?.name,
+      amount_paid: t.amount,
+      payment_date: t.payment_date,
+      status: 'paid' // Transactions are always paid if they exist here
+    })) || [];
 
-    const totalAmount = feesData?.reduce((sum, t) => sum + (t.amount_paid || 0), 0) || 0;
+    setReportData(processedData);
+
+    const totalAmount = feesData?.reduce((sum, t) => sum + (t.amount || 0), 0) || 0;
     const totalTransactions = feesData?.length || 0;
-    const paidCount = feesData?.filter(t => t.status === 'paid').length || 0;
-    const pendingCount = feesData?.filter(t => t.status === 'pending').length || 0;
 
+    // For summary, we might want to query fee_installments separately to get pending, 
+    // but for now let's show transaction stats.
     setSummary({
       totalAmount,
       totalTransactions,
-      paidCount,
-      pendingCount,
+      avgTransaction: totalTransactions > 0 ? (totalAmount / totalTransactions).toFixed(2) : 0
     });
   };
 
   const generateExamsReport = async () => {
     const { data: examsData } = await supabase
-      .from('exam_results')
+      .from('marks')
       .select(`
         *,
         students:student_id (name, admission_number),
-        exams:exam_id (exam_name, subject)
+        exams:exam_id (name, exam_type),
+        subjects:subject_id (name)
       `)
       .eq('school_id', schoolId)
       .order('created_at', { ascending: false });
 
-    setReportData(examsData || []);
+    const processedData = examsData?.map((r: any) => ({
+      student_name: r.students?.name,
+      admission_number: r.students?.admission_number,
+      exam_name: r.exams?.name,
+      subject: r.subjects?.name,
+      marks_obtained: r.marks_obtained,
+      max_marks: r.max_marks,
+      grade: r.grade,
+      date: r.created_at.split('T')[0]
+    })) || [];
+
+    setReportData(processedData);
 
     const totalResults = examsData?.length || 0;
     const avgMarks = totalResults > 0
       ? (examsData?.reduce((sum, r) => sum + (r.marks_obtained || 0), 0) / totalResults).toFixed(2)
       : 0;
-    const passCount = examsData?.filter(r => r.grade && !['F', 'Fail'].includes(r.grade)).length || 0;
+
+    // Simple pass check (assuming grade 'F' or < 33% is fail if no grade)
+    const passCount = examsData?.filter(r => {
+      if (r.grade) return !['F', 'Fail', 'E'].includes(r.grade);
+      return (r.marks_obtained / r.max_marks) >= 0.33;
+    }).length || 0;
+
     const passRate = totalResults > 0 ? ((passCount / totalResults) * 100).toFixed(1) : 0;
 
     setSummary({
@@ -197,11 +231,10 @@ export function Reports() {
             <button
               key={type.id}
               onClick={() => setSelectedReport(type.id as ReportType)}
-              className={`p-4 rounded-xl border-2 transition-all ${
-                selectedReport === type.id
-                  ? 'border-blue-600 bg-blue-50'
-                  : 'border-slate-200 bg-white hover:border-slate-300'
-              }`}
+              className={`p-4 rounded-xl border-2 transition-all ${selectedReport === type.id
+                ? 'border-blue-600 bg-blue-50'
+                : 'border-slate-200 bg-white hover:border-slate-300'
+                }`}
             >
               <Icon className={`w-6 h-6 mb-2 ${selectedReport === type.id ? 'text-blue-600' : 'text-slate-600'}`} />
               <p className={`text-sm font-medium ${selectedReport === type.id ? 'text-blue-900' : 'text-slate-700'}`}>

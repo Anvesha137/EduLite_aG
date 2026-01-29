@@ -108,16 +108,8 @@ export default function CertificateManagement() {
       .eq('is_active', true)
       .order('name');
 
-    if (data && data.length > 0) {
+    if (data) {
       setAwardTypes(data);
-    } else {
-      // MOCK DATA
-      setAwardTypes([
-        { id: 'mk-1', name: 'Student of the Year', is_global: true, is_active: true },
-        { id: 'mk-2', name: 'Sportsmanship Award', is_global: true, is_active: true },
-        { id: 'mk-3', name: 'Academic Excellence', is_global: true, is_active: true },
-        { id: 'mk-4', name: 'Best Attendance', is_global: true, is_active: true },
-      ]);
     }
   };
 
@@ -128,15 +120,8 @@ export default function CertificateManagement() {
       .eq('school_id', schoolId)
       .order('grade_order');
 
-    if (data && data.length > 0) {
+    if (data) {
       setClasses(data);
-    } else {
-      // MOCK DATA
-      setClasses([
-        { id: 'mc-1', grade: '10' },
-        { id: 'mc-2', grade: '11' },
-        { id: 'mc-3', grade: '12' }
-      ]);
     }
   };
 
@@ -147,14 +132,8 @@ export default function CertificateManagement() {
       .eq('class_id', classId)
       .order('name');
 
-    if (data && data.length > 0) {
+    if (data) {
       setSections(data);
-    } else {
-      // MOCK DATA
-      setSections([
-        { id: 'ms-1', name: 'A', class_id: classId },
-        { id: 'ms-2', name: 'B', class_id: classId }
-      ]);
     }
   };
 
@@ -180,15 +159,10 @@ export default function CertificateManagement() {
     }
 
     const { data } = await query;
-    if (data && data.length > 0) {
+    if (data) {
       setStudents(data as any);
     } else {
-      // MOCK DATA
-      setStudents([
-        { id: 'st-1', name: 'Arjun Singh', admission_number: 'A-101', class: { grade: '10' }, section: { name: 'A' } },
-        { id: 'st-2', name: 'Zara Khan', admission_number: 'A-102', class: { grade: '10' }, section: { name: 'A' } },
-        { id: 'st-3', name: 'Vihaan Gupta', admission_number: 'A-103', class: { grade: '10' }, section: { name: 'B' } }
-      ]);
+      setStudents([]);
     }
   };
 
@@ -199,15 +173,8 @@ export default function CertificateManagement() {
       .eq('school_id', schoolId)
       .eq('is_active', true);
 
-    if (data && data.length > 0) {
+    if (data) {
       setTemplates(data);
-    } else {
-      // MOCK DATA
-      setTemplates([
-        { id: 't-1', name: 'Classic Golden', is_default: true, is_active: true },
-        { id: 't-2', name: 'Modern Blue', is_default: false, is_active: true },
-        { id: 't-3', name: 'Minimalist', is_default: false, is_active: true }
-      ]);
     }
   };
 
@@ -222,32 +189,8 @@ export default function CertificateManagement() {
       .eq('school_id', schoolId)
       .order('created_at', { ascending: false });
 
-    if (data && data.length > 0) {
+    if (data) {
       setAwards(data as any);
-    } else {
-      // MOCK DATA
-      setAwards([
-        {
-          id: 'aw-1',
-          student: { name: 'Arjun Singh', admission_number: 'A-101' },
-          award_type: { name: 'Student of the Year' },
-          award_name: 'Student of the Year',
-          event_name: 'Annual Day 2024',
-          event_date: '2024-12-15',
-          position: 'Winner',
-          created_at: '2024-12-16T10:00:00Z'
-        },
-        {
-          id: 'aw-2',
-          student: { name: 'Zara Khan', admission_number: 'A-102' },
-          award_type: { name: 'Math Olympiad' },
-          award_name: 'Math Olympiad',
-          event_name: 'Inter-School Competition',
-          event_date: '2024-11-20',
-          position: '2nd Place',
-          created_at: '2024-11-21T09:30:00Z'
-        }
-      ]);
     }
   };
 

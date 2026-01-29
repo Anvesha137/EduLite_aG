@@ -20,6 +20,7 @@ interface StudentFeeData {
   status: string;
   class_id: string;
   section_id: string;
+  school_id?: string; // DEBUG FIELD
 }
 
 interface InstallmentData {
@@ -35,7 +36,13 @@ interface InstallmentData {
 
 export function FeeManagement() {
   const { schoolId, loading: schoolLoading } = useSchool();
-  const userId = 'demo-user-id';
+  const [userId, setUserId] = useState<string>('');
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) setUserId(user.id);
+    });
+  }, []);
   const [studentFees, setStudentFees] = useState<StudentFeeData[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [sections, setSections] = useState<any[]>([]);
@@ -70,11 +77,13 @@ export function FeeManagement() {
       if (classesRes.data) setClasses(classesRes.data);
       if (sectionsRes.data) setSections(sectionsRes.data);
 
+      console.log('Fetching fees for:', { schoolId, currentAcademicYear });
+
       let query = supabase
         .from('student_fees')
         .select(`
           *,
-          student:students!inner(
+          student:students(
             id,
             name,
             admission_number,
@@ -82,10 +91,11 @@ export function FeeManagement() {
             section_id,
             section:sections(id, name)
           ),
-          class:classes!inner(id, grade)
+          class:classes(id, grade)
         `)
-        .eq('school_id', schoolId)
         .eq('academic_year', currentAcademicYear);
+      // .eq('school_id', schoolId) // DEBUG: Removed filter to find where data is
+
 
       if (filterClass) {
         query = query.eq('class_id', filterClass);
@@ -96,15 +106,20 @@ export function FeeManagement() {
 
       const { data: feesData, error } = await query;
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching fees:', error);
+        throw error;
+      }
+
+      console.log('Raw Fees Data:', feesData);
 
       const formattedData: StudentFeeData[] = (feesData || []).map((fee: any) => ({
         id: fee.id,
-        student_id: fee.student.id,
-        student_name: fee.student.name,
-        admission_number: fee.student.admission_number,
-        class_name: fee.class.grade,
-        section_name: fee.student.section?.name || '',
+        student_id: fee.student?.id || fee.student_id,
+        student_name: fee.student?.name || 'Unknown Student',
+        admission_number: fee.student?.admission_number || 'N/A',
+        class_name: fee.class?.grade || 'N/A',
+        section_name: fee.student?.section?.name || '',
         total_fee: parseFloat(fee.total_fee),
         discount_amount: parseFloat(fee.discount_amount || 0),
         net_fee: parseFloat(fee.net_fee),
@@ -112,91 +127,47 @@ export function FeeManagement() {
         pending_amount: parseFloat(fee.pending_amount),
         status: fee.status,
         class_id: fee.class_id,
-        section_id: fee.student.section_id,
+        section_id: fee.student?.section_id,
+        school_id: fee.school_id, // Map for debug
       }));
 
       setStudentFees(formattedData);
 
-      // MOCK DATA INJECTION
-      if (formattedData.length === 0) {
-        setStudentFees([
-          {
-            id: 'mock-1',
-            student_id: 'mock-s-1',
-            student_name: 'Rahul Sharma',
-            admission_number: 'ADM-2024-001',
-            class_name: '10',
-            section_name: 'A',
-            total_fee: 50000,
-            discount_amount: 5000,
-            net_fee: 45000,
-            paid_amount: 45000,
-            pending_amount: 0,
-            status: 'paid',
-            class_id: 'mock-c-1',
-            section_id: 'mock-sec-1'
-          },
-          {
-            id: 'mock-2',
-            student_id: 'mock-s-2',
-            student_name: 'Priya Patel',
-            admission_number: 'ADM-2024-002',
-            class_name: '10',
-            section_name: 'A',
-            total_fee: 50000,
-            discount_amount: 0,
-            net_fee: 50000,
-            paid_amount: 25000,
-            pending_amount: 25000,
-            status: 'partially_paid',
-            class_id: 'mock-c-1',
-            section_id: 'mock-sec-1'
-          },
-          {
-            id: 'mock-3',
-            student_id: 'mock-s-3',
-            student_name: 'Amit Kumar',
-            admission_number: 'ADM-2024-005',
-            class_name: '11',
-            section_name: 'B',
-            total_fee: 60000,
-            discount_amount: 0,
-            net_fee: 60000,
-            paid_amount: 10000,
-            pending_amount: 50000,
-            status: 'overdue',
-            class_id: 'mock-c-2',
-            section_id: 'mock-sec-2'
-          },
-          {
-            id: 'mock-4',
-            student_id: 'mock-s-4',
-            student_name: 'Sneha Gupta',
-            admission_number: 'ADM-2024-010',
-            class_name: '9',
-            section_name: 'C',
-            total_fee: 45000,
-            discount_amount: 2000,
-            net_fee: 43000,
-            paid_amount: 0,
-            pending_amount: 43000,
-            status: 'unpaid',
-            class_id: 'mock-c-3',
-            section_id: 'mock-sec-3'
-          }
+      // Ensure we have some classes for filter if empty
+      if (classes.length === 0) {
+        setClasses([
+          { id: 'mock-c-1', grade: '10' },
+          { id: 'mock-c-2', grade: '11' },
+          { id: 'mock-c-3', grade: '9' }
         ]);
-
-        // Ensure we have some classes for filter if empty
-        if (classes.length === 0) {
-          setClasses([
-            { id: 'mock-c-1', grade: '10' },
-            { id: 'mock-c-2', grade: '11' },
-            { id: 'mock-c-3', grade: '9' }
-          ]);
-        }
       }
     } catch (error) {
       console.error('Error loading fee data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fixMissingData = async () => {
+    if (!confirm('This will Use ADMIN PRIVILEGES to backfill missing fee records. Continue?')) return;
+
+    try {
+      setLoading(true);
+
+      console.log('Calling admin backfill RPC...');
+      const { data, error } = await supabase.rpc('backfill_missing_fees_v2', {
+        p_school_id: schoolId
+      });
+
+      if (error) throw error;
+
+      console.log('RPC Result:', data);
+      alert(data?.message || 'Process complete.');
+      loadData();
+
+    } catch (error: any) {
+      console.error('Error fixing data:', error);
+      alert('Error fixing data: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -267,7 +238,25 @@ export function FeeManagement() {
           <div className="px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg">
             <p className="text-sm text-blue-700">Academic Year: {currentAcademicYear}</p>
           </div>
+          <button
+            onClick={fixMissingData}
+            disabled={loading}
+            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-lg text-sm font-medium transition-colors"
+          >
+            Fix Missing Data
+          </button>
         </div>
+      </div>
+
+      {/* DEBUG DIAGNOSTICS */}
+      <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg mb-4 text-xs font-mono text-amber-900">
+        <p><strong>Debug Info:</strong></p>
+        <p>School ID: {schoolId || 'NULL'}</p>
+        <p>User ID: {userId || 'NULL'}</p>
+        <p>Filter Class: {filterClass || 'None'}</p>
+        <p>Filter Status: {filterStatus || 'None'}</p>
+        <p>Raw Records Found: {studentFees.length}</p>
+        <p>First Record School ID: {studentFees[0]?.school_id || 'N/A'}</p>
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
@@ -494,13 +483,13 @@ function PaymentModal({ isOpen, onClose, studentFee, onSave, schoolId, userId }:
 
       const paymentData = {
         school_id: schoolId,
-        student_id: studentFee.student_id,
+        // student_id: studentFee.student_id, // REMOVED: Not in schema
         student_fee_id: studentFee.id,
         amount: paymentAmount,
         payment_mode: paymentMode,
         transaction_ref: transactionRef || null,
         payment_date: new Date().toISOString().split('T')[0],
-        received_by: userId,
+        paid_by: userId || null, // Sanitize UUID
         remarks: remarks || null,
       };
 
@@ -788,14 +777,14 @@ function InstallmentPaymentModal({ isOpen, onClose, installment, studentFee, onS
 
       const paymentData = {
         school_id: schoolId,
-        student_id: studentFee.student_id,
+        // student_id: studentFee.student_id, // REMOVED: Not in schema
         student_fee_id: studentFee.id,
         installment_id: installment.id,
         amount: paymentAmount,
         payment_mode: paymentMode,
         transaction_ref: transactionRef || null,
         payment_date: new Date().toISOString().split('T')[0],
-        received_by: userId,
+        paid_by: userId || null, // Fix column name and Sanitize UUID
         remarks: remarks || null,
       };
 
@@ -934,11 +923,11 @@ function DiscountModal({ isOpen, onClose, studentFee, onSave, schoolId, userId }
         school_id: schoolId,
         student_fee_id: studentFee.id,
         student_id: studentFee.student_id,
-        requested_by: userId,
+        requested_by: userId || null, // Sanitize UUID
         requested_amount: discountAmount,
         reason: reason,
         status: 'approved',
-        reviewed_by: userId,
+        reviewed_by: userId || null, // Sanitize UUID
         reviewed_at: new Date().toISOString(),
         review_comments: 'Auto-approved by admin',
       };
@@ -951,7 +940,7 @@ function DiscountModal({ isOpen, onClose, studentFee, onSave, schoolId, userId }
         .update({
           discount_amount: discountAmount,
           discount_reason: reason,
-          discount_approved_by: userId,
+          discount_approved_by: userId || null, // Sanitize UUID
           discount_approved_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
@@ -1029,6 +1018,72 @@ function DiscountModal({ isOpen, onClose, studentFee, onSave, schoolId, userId }
           </button>
         </div>
       </form>
+    </Modal>
+  );
+}
+
+interface ReceiptModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  studentFee: StudentFeeData;
+  schoolId: string;
+}
+
+function ReceiptModal({ isOpen, onClose, studentFee, schoolId }: ReceiptModalProps) {
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} title={`Fee Receipt - ${studentFee.student_name}`} size="lg">
+      <div className="space-y-6">
+        <div className="border-b border-slate-200 pb-4">
+          <div className="flex justify-between items-start">
+            <div>
+              <h3 className="font-bold text-lg text-slate-900">Fee Receipt</h3>
+              <p className="text-sm text-slate-500">Date: {new Date().toLocaleDateString()}</p>
+            </div>
+            <div className="text-right">
+              <p className="font-bold text-slate-900">{studentFee.student_name}</p>
+              <p className="text-sm text-slate-500">ADM: {studentFee.admission_number}</p>
+              <p className="text-sm text-slate-500">Class: {studentFee.class_name} - {studentFee.section_name}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="flex justify-between">
+              <span className="text-slate-600">Total Fee Applicable</span>
+              <span className="font-medium">{formatCurrency(studentFee.total_fee)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-600">Total Paid</span>
+              <span className="font-medium text-green-700">{formatCurrency(studentFee.paid_amount)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-600">Discount</span>
+              <span className="font-medium text-blue-700">{formatCurrency(studentFee.discount_amount)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-slate-600">Balance Due</span>
+              <span className="font-medium text-red-700">{formatCurrency(studentFee.pending_amount)}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-3 pt-4 no-print">
+          <button
+            onClick={() => window.print()}
+            className="px-4 py-2 bg-slate-800 text-white rounded-lg flex items-center gap-2 hover:bg-slate-900"
+          >
+            <Printer className="w-4 h-4" />
+            Print
+          </button>
+          <button
+            onClick={onClose}
+            className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50"
+          >
+            Close
+          </button>
+        </div>
+      </div>
     </Modal>
   );
 }

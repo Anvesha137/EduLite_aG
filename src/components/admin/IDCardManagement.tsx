@@ -40,7 +40,7 @@ export default function IDCardManagement() {
   // const userId = '00000000-0000-0000-0000-000000000000'; // REMOVED DUMMY ID
   const [userId, setUserId] = useState<string | null>(null);
 
-  const [activeTab, setActiveTab] = useState<'student_cards' | 'staff_cards' | 'history' | 'settings'>('student_cards');
+  const [activeTab, setActiveTab] = useState<'student_cards' | 'staff_cards' | 'history' | 'settings'>('settings');
   const [cardType, setCardType] = useState<'student' | 'educator'>('student');
   // Templates are now system-fixed based on card type
 
@@ -101,7 +101,7 @@ export default function IDCardManagement() {
     } else if (activeTab === 'history') {
       loadGenerations();
     }
-  }, [activeTab]);
+  }, [activeTab, filterClass, filterSection, generationFilter, schoolId]);
 
   useEffect(() => {
     loadSettings();
@@ -148,15 +148,8 @@ export default function IDCardManagement() {
       .eq('school_id', schoolId)
       .order('grade_order');
 
-    if (data && data.length > 0) {
+    if (data) {
       setClasses(data);
-    } else {
-      // MOCK CLASSES
-      setClasses([
-        { id: 'mk-c-1', grade: '10' },
-        { id: 'mk-c-2', grade: '11' },
-        { id: 'mk-c-3', grade: '9' }
-      ]);
     }
   };
 
@@ -167,14 +160,8 @@ export default function IDCardManagement() {
       .eq('class_id', classId)
       .order('name');
 
-    if (data && data.length > 0) {
+    if (data) {
       setSections(data);
-    } else {
-      // MOCK SECTIONS
-      setSections([
-        { id: 'mk-s-1', name: 'A', class_id: classId },
-        { id: 'mk-s-2', name: 'B', class_id: classId }
-      ]);
     }
   };
 
@@ -202,15 +189,10 @@ export default function IDCardManagement() {
     }
 
     const { data, error } = await query;
-    if (!error && data && data.length > 0) {
+    if (!error && data) {
       setStudents(data as any);
     } else {
-      // MOCK STUDENTS
-      setStudents([
-        { id: 'mk-st-1', name: 'Rahul Sharma', admission_number: 'A-101', class: { grade: '10' }, section: { name: 'A' }, photo_url: 'https://via.placeholder.com/150' },
-        { id: 'mk-st-2', name: 'Priya Patel', admission_number: 'A-102', class: { grade: '10' }, section: { name: 'A' }, photo_url: '' },
-        { id: 'mk-st-3', name: 'Amit Kumar', admission_number: 'A-103', class: { grade: '11' }, section: { name: 'B' }, photo_url: 'https://via.placeholder.com/150' },
-      ] as any);
+      setStudents([]);
     }
   };
 
@@ -223,14 +205,10 @@ export default function IDCardManagement() {
       .eq('status', 'active')
       .order('name');
 
-    if (!error && data && data.length > 0) {
+    if (!error && data) {
       setEducators(data);
     } else {
-      // MOCK EDUCATORS
-      setEducators([
-        { id: 'mk-ed-1', name: 'Mr. John Doe', employee_id: 'EMP-001', designation: 'Math Teacher', photo_url: 'https://via.placeholder.com/150' },
-        { id: 'mk-ed-2', name: 'Ms. Jane Smith', employee_id: 'EMP-002', designation: 'Science Teacher', photo_url: '' },
-      ]);
+      setEducators([]);
     }
   };
 
@@ -625,10 +603,10 @@ export default function IDCardManagement() {
       <div className="border-b border-slate-200">
         <div className="flex gap-4">
           {[
+            { id: 'settings', label: 'Settings', icon: Settings },
             { id: 'student_cards', label: 'Student ID Cards', icon: Users },
             { id: 'staff_cards', label: 'Staff ID Cards', icon: CreditCard },
-            { id: 'history', label: 'History', icon: FileDown },
-            { id: 'settings', label: 'Settings', icon: Settings }
+            { id: 'history', label: 'History', icon: FileDown }
           ].map(tab => (
             <button
               key={tab.id}
