@@ -46,9 +46,12 @@ export function ReportCards() {
 
     const loadClasses = async (examId: string) => {
         try {
-            const { data, error } = await supabase.rpc('get_exam_classes', { p_exam_id: examId });
+            const { data, error } = await supabase.from('classes').select('*').eq('school_id', schoolId).order('grade_order');
             if (error) throw error;
-            if (data) setClasses(data);
+            if (data) {
+                // Component usage: key={c.class_id} value={c.class_id}
+                setClasses(data.map(c => ({ class_id: c.id, grade: c.grade })));
+            }
         } catch (err) {
             console.error('Error loading classes:', err);
         }

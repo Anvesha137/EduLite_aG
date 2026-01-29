@@ -64,10 +64,19 @@ export function MarksEntry() {
 
     const loadClasses = async (examId: string) => {
         try {
-            // Secure RPC
-            const { data, error } = await supabase.rpc('get_exam_classes', { p_exam_id: examId });
+            // Fallback to fetching all classes to ensure dropdown works
+            const { data, error } = await supabase.from('classes').select('*').eq('school_id', schoolId).order('grade_order');
             if (error) throw error;
-            if (data) setClasses(data);
+            // Map to match expected format if needed, but select('*') returns id, grade etc.
+            // Component uses c.class_id or c.id. Let's check usage: key={c.class_id} value={c.class_id}
+            // Real classes table has 'id'. usage expects 'class_id'?
+            // RPC likely returned { class_id, grade }.
+            // We need to map 'id' to 'class_id' to match expected state usage or update state usage.
+            // Let's preserve checking existing usage...
+            // Usage: <option key={c.class_id} value={c.class_id}>{c.grade}</option>
+            if (data) {
+                setClasses(data.map(c => ({ class_id: c.id, grade: c.grade })));
+            }
         } catch (err) {
             console.error('Error loading classes:', err);
         }

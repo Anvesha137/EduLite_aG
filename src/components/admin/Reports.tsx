@@ -76,43 +76,57 @@ export function Reports() {
   };
 
   const generateFeesReport = async () => {
-    const { data: feesData } = await supabase
-      .from('fee_transactions')
+    // 1. Fetch Paid Student Fees for the Table (User Request: "rows for Paid")
+    const { data: feesData, error: feesError } = await supabase
+      .from('student_fees')
       .select(`
         *,
-        students:student_id (name, admission_number),
-        installment:installment_id (
-          amount,
-          fee_head:fee_head_id (name)
-        )
+        student:students(name, admission_number),
+        class:classes(grade),
+        section:sections(name)
       `)
       .eq('school_id', schoolId)
-      .gte('payment_date', startDate)
-      .lte('payment_date', endDate)
-      .order('payment_date', { ascending: false });
+      .eq('status', 'paid')
+      .order('updated_at', { ascending: false });
 
-    // Transform data for display/export
-    const processedData = feesData?.map((t: any) => ({
-      ...t,
-      student_name: t.students?.name,
-      admission_number: t.students?.admission_number,
-      fee_type: t.installment?.fee_head?.name,
-      amount_paid: t.amount,
-      payment_date: t.payment_date,
-      status: 'paid' // Transactions are always paid if they exist here
+    if (feesError) {
+      console.error('Error fetching fees data:', feesError);
+    }
+
+    // Process table data
+    const processedData = feesData?.map((fee: any) => ({
+      student_name: fee.student?.name || 'Unknown',
+      admission_number: fee.student?.admission_number || 'N/A',
+      class_grade: fee.class?.grade || 'N/A',
+      section_name: fee.section?.name || '',
+      total_fee: fee.total_fee,
+      amount_paid: fee.paid_amount, // Show full paid amount in table
+      date: fee.updated_at ? fee.updated_at.split('T')[0] : 'N/A',
+      status: 'Paid'
     })) || [];
 
     setReportData(processedData);
 
-    const totalAmount = feesData?.reduce((sum, t) => sum + (t.amount || 0), 0) || 0;
-    const totalTransactions = feesData?.length || 0;
+    // 2. Fetch Fee Transactions to calculate accurate Total Amount, Total Transactions, Avg Transaction
+    const { data: transactionsData, error: txError } = await supabase
+      .from('fee_payments')
+      .select('amount, payment_date')
+      .eq('school_id', schoolId)
+      .gte('payment_date', startDate)
+      .lte('payment_date', endDate);
 
-    // For summary, we might want to query fee_installments separately to get pending, 
-    // but for now let's show transaction stats.
+    if (txError) {
+      console.error('Error fetching transactions:', txError);
+    }
+
+    const totalAmount = transactionsData?.reduce((sum, t) => sum + (t.amount || 0), 0) || 0;
+    const totalTransactions = transactionsData?.length || 0;
+    const avgTransaction = totalTransactions > 0 ? (totalAmount / totalTransactions).toFixed(2) : 0;
+
     setSummary({
       totalAmount,
       totalTransactions,
-      avgTransaction: totalTransactions > 0 ? (totalAmount / totalTransactions).toFixed(2) : 0
+      avgTransaction
     });
   };
 
@@ -281,25 +295,94 @@ export function Reports() {
         ) : summary ? (
           <div className="space-y-6">
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {Object.entries(summary).map(([key, value]) => (
-                <div key={key} className="bg-slate-50 rounded-lg p-4">
-                  <p className="text-sm text-slate-600 capitalize mb-1">
-                    {key.replace(/([A-Z])/g, ' $1').trim()}
-                  </p>
-                  <p className="text-2xl font-bold text-slate-900">
-                    {typeof value === 'number' && key.includes('Amount') ? `$${value.toFixed(2)}` : value}
-                    {key.includes('Rate') || key.includes('Percentage') ? '%' : ''}
-                  </p>
-                </div>
-              ))}
+              {Object.entries(summary).map(([key, value]) => {
+                let displayValue: React.ReactNode = value as React.ReactNode;
+                let label = key.replace(/([A-Z])/g, ' $1').trim();
+
+                if (typeof value === 'number') {
+                  if (key.toLowerCase().includes('amount') || key.toLowerCase().includes('avg')) {
+                    displayValue = `$${value.toFixed(2)}`;
+                  } else if (key.toLowerCase().includes('rate') || key.toLowerCase().includes('percentage')) {
+                    displayValue = `${value}%`;
+                  } else {
+                    displayValue = value.toString();
+                  }
+                }
+
+                return (
+                  <div key={key} className="bg-slate-50 rounded-lg p-4">
+                    <p className="text-sm text-slate-600 capitalize mb-1">
+                      {label}
+                    </p>
+                    <p className="text-2xl font-bold text-slate-900">
+                      {displayValue}
+                    </p>
+                  </div>
+                );
+              })}
             </div>
 
             <div className="border-t border-slate-200 pt-4">
-              <h3 className="text-lg font-semibold text-slate-900 mb-4">Report Data</h3>
+              <h3 className="text-lg font-semibold text-slate-900 mb-4">Report Data: {selectedReport.charAt(0).toUpperCase() + selectedReport.slice(1)}</h3>
+
               <div className="overflow-x-auto">
-                <p className="text-sm text-slate-600">
-                  {reportData.length} records found. Click "Download Report" to export as CSV.
-                </p>
+                {selectedReport === 'fees' ? (
+                  <table className="w-full text-sm text-left">
+                    <thead className="bg-slate-50 text-slate-500 uppercase font-medium">
+                      <tr>
+                        <th className="px-4 py-3">Student</th>
+                        <th className="px-4 py-3">Admission No</th>
+                        <th className="px-4 py-3">Class</th>
+                        <th className="px-4 py-3 text-right">Total Fee</th>
+                        <th className="px-4 py-3 text-right">Paid Amount</th>
+                        <th className="px-4 py-3 text-center">Date</th>
+                        <th className="px-4 py-3 text-center">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                      {reportData.map((row, idx) => (
+                        <tr key={idx} className="hover:bg-slate-50">
+                          <td className="px-4 py-3 font-medium text-slate-900">{row.student_name}</td>
+                          <td className="px-4 py-3 text-slate-600">{row.admission_number}</td>
+                          <td className="px-4 py-3 text-slate-600">{row.class_grade} {row.section_name && `(${row.section_name})`}</td>
+                          <td className="px-4 py-3 text-right text-slate-900 font-medium">${row.total_fee}</td>
+                          <td className="px-4 py-3 text-right text-green-700 font-bold">${row.amount_paid}</td>
+                          <td className="px-4 py-3 text-center text-slate-600">{row.date}</td>
+                          <td className="px-4 py-3 text-center">
+                            <span className="px-2 py-1 rounded-full text-xs font-bold bg-green-100 text-green-700">
+                              {row.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  // Default/Other Reports table fallback (Attendance, Exams, Students)
+                  <table className="w-full text-sm text-left">
+                    <thead className="bg-slate-50 text-slate-500 uppercase font-medium">
+                      <tr>
+                        {/* Auto-generate headers provided data is consistent */}
+                        {Object.keys(reportData[0] || {}).slice(0, 6).map(key => (
+                          <th key={key} className="px-4 py-3">{key.replace(/_/g, ' ')}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                      {reportData.map((row, idx) => (
+                        <tr key={idx} className="hover:bg-slate-50">
+                          {Object.values(row).slice(0, 6).map((val: any, vIdx) => (
+                            <td key={vIdx} className="px-4 py-3 text-slate-700">{val}</td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+
+                {reportData.length === 0 && (
+                  <div className="text-center py-8 text-slate-500">No records found.</div>
+                )}
               </div>
             </div>
           </div>
