@@ -46,11 +46,13 @@ export function ReportCards() {
 
     const loadClasses = async (examId: string) => {
         try {
-            const { data, error } = await supabase.from('classes').select('*').eq('school_id', schoolId).order('grade_order');
+            // Secure RPC for strict filtering
+            const { data, error } = await supabase.rpc('get_exam_classes', { p_exam_id: examId });
             if (error) throw error;
             if (data) {
-                // Component usage: key={c.class_id} value={c.class_id}
-                setClasses(data.map(c => ({ class_id: c.id, grade: c.grade })));
+                // Map to match expected format: { class_id, grade }
+                // The RPC returns classes table rows { id, grade, ... }
+                setClasses(data.map((c: any) => ({ class_id: c.id, grade: c.grade })));
             }
         } catch (err) {
             console.error('Error loading classes:', err);

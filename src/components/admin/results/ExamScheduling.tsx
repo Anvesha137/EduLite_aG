@@ -434,21 +434,14 @@ function ManageSubjectsModal({ isOpen, onClose, exam, schoolId }: any) {
     const handleSave = async () => {
         setSaving(true);
         try {
-            // Delete all existing
-            await supabase.from('exam_subjects').delete().eq('exam_id', exam.id);
+            // Atomic RPC call for safe assignment (bypasses RLS)
+            const { error } = await supabase.rpc('assign_exam_subjects', {
+                p_exam_id: exam.id,
+                p_subject_ids: selectedSubjects,
+                p_school_id: schoolId
+            });
 
-            // Insert new
-            if (selectedSubjects.length > 0) {
-                const { error } = await supabase.from('exam_subjects').insert(
-                    selectedSubjects.map(sid => ({
-                        exam_id: exam.id,
-                        subject_id: sid,
-                        school_id: schoolId,
-                        max_marks: 100 // Default, can be editable later
-                    }))
-                );
-                if (error) throw error;
-            }
+            if (error) throw error;
             alert('Subjects updated successfully!');
             onClose();
         } catch (err: any) {

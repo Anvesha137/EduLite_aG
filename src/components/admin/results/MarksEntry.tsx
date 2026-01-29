@@ -64,18 +64,17 @@ export function MarksEntry() {
 
     const loadClasses = async (examId: string) => {
         try {
-            // Fallback to fetching all classes to ensure dropdown works
-            const { data, error } = await supabase.from('classes').select('*').eq('school_id', schoolId).order('grade_order');
+            // Secure RPC for strict filtering as per user request
+            const { data, error } = await supabase.rpc('get_exam_classes', { p_exam_id: examId });
             if (error) throw error;
-            // Map to match expected format if needed, but select('*') returns id, grade etc.
-            // Component uses c.class_id or c.id. Let's check usage: key={c.class_id} value={c.class_id}
-            // Real classes table has 'id'. usage expects 'class_id'?
-            // RPC likely returned { class_id, grade }.
-            // We need to map 'id' to 'class_id' to match expected state usage or update state usage.
-            // Let's preserve checking existing usage...
-            // Usage: <option key={c.class_id} value={c.class_id}>{c.grade}</option>
             if (data) {
-                setClasses(data.map(c => ({ class_id: c.id, grade: c.grade })));
+                // Map to match expected format: { class_id, grade }
+                // The RPC returns classes table rows { id, grade, ... }
+                // We need to map 'id' -> 'class_id' for consistency with downstream disabled logic if any, 
+                // or just usage. Previous usage was: value={c.class_id}.
+                // Let's check RPC return. It returns SETOF classes. So columns are id, grade...
+                // Component expects: class_id.
+                setClasses(data.map((c: any) => ({ class_id: c.id, grade: c.grade })));
             }
         } catch (err) {
             console.error('Error loading classes:', err);
@@ -84,32 +83,13 @@ export function MarksEntry() {
 
     const loadSubjects = async (examId: string, classId: string) => {
         try {
-            // Ideally fetch from exam_subjects configuration via RPC
-            // For now, consistent with previous approach but safer with fallback if RPC missing?
-            // We can query exam_subjects directly IF no RLS blocks, but better to use what we have.
-            // Let's use direct query for now, but wrapped in try-catch. 
-            // NOTE: I haven't made get_exam_subjects RPC yet. If this fails, I'll need to add it.
-            // But exam_subjects is usually readable.
+            // Strict filtering via RPC
+            const { data, error } = await supabase.rpc('get_exam_subjects', { p_exam_id: examId });
 
-            const { data, error } = await supabase
-                .from('exam_subjects')
-                .select('subject:subjects(id, name), max_marks, passing_marks')
-                .eq('exam_id', examId)
-                .eq('class_id', classId);
+            if (error) throw error;
 
-            if (data && data.length > 0) {
-                setSubjects(data.map((d: any) => ({
-                    id: d.subject.id,
-                    name: d.subject.name,
-                    max_marks: d.max_marks
-                })));
-            } else {
-                // Fallback: Fetch all subjects for the school
-                // Note: 'subjects' table usually has relaxed RLS or readable by educators
-                const { data: allSubjects } = await supabase.from('subjects').select('*').eq('school_id', schoolId);
-                if (allSubjects) {
-                    setSubjects(allSubjects.map(s => ({ ...s, max_marks: 100 }))); // Default 100
-                }
+            if (data) {
+                setSubjects(data);
             }
         } catch (err) {
             console.error('Error loading subjects:', err);

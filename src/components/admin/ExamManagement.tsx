@@ -106,17 +106,19 @@ export function ExamManagement() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
                   <div>
                     <p className="text-sm text-slate-600">Class</p>
-                    <p className="font-medium text-slate-900">{(exam as any).class?.grade || 'All Classes'}</p>
+                    <p className="font-medium text-slate-900">
+                      {(exam as any).class?.grade || 'All Classes'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-600">Date Range</p>
+                    <p className="font-medium text-slate-900">
+                      {formatDate(exam.start_date)} - {formatDate(exam.end_date)}
+                    </p>
                   </div>
                   <div>
                     <p className="text-sm text-slate-600">Academic Year</p>
                     <p className="font-medium text-slate-900">{exam.academic_year}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-slate-600">Duration</p>
-                    <p className="font-medium text-slate-900">
-                      {formatDate(exam.start_date)} - {formatDate(exam.end_date)}
-                    </p>
                   </div>
                 </div>
               </div>
@@ -138,8 +140,8 @@ export function ExamManagement() {
                 <button
                   onClick={() => togglePublish(exam)}
                   className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${exam.is_published
-                      ? 'bg-amber-50 hover:bg-amber-100 text-amber-700'
-                      : 'bg-green-50 hover:bg-green-100 text-green-700'
+                    ? 'bg-amber-50 hover:bg-amber-100 text-amber-700'
+                    : 'bg-green-50 hover:bg-green-100 text-green-700'
                     }`}
                 >
                   {exam.is_published ? 'Unpublish' : 'Publish'}
