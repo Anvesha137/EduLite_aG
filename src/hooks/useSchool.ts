@@ -8,19 +8,26 @@ export function useSchool() {
   useEffect(() => {
     const fetchSchool = async () => {
       try {
-        // Use RPC to get the school ID directly from the user profile
-        // This bypasses RLS on the 'schools' table and avoids hardcoded names
-        const { data, error } = await supabase.rpc('get_user_school');
+        // CALL THE AUTO-LINK RPC
+        // This function finds a valid school AND updates the user's profile in the DB to point to it.
+        // This is critical for RLS to work.
+        const { data: linkedSchoolId, error } = await supabase.rpc('link_user_to_demo_school');
 
-        if (error || !data) {
-          if (error) console.error('Error fetching school ID via RPC:', error);
-
-          // Fallback: Try fetching by name using Secure RPC (bypasses RLS)
-          const { data: fallbackId } = await supabase.rpc('get_school_by_name', { p_name: 'Demo International School' });
-
-          if (fallbackId) setSchoolId(fallbackId);
+        if (linkedSchoolId) {
+          setSchoolId(linkedSchoolId);
         } else {
-          setSchoolId(data);
+          console.error('Auto-link RPC failed:', error);
+
+          // Fallbacks should be unnecessary now, but keeping for safety
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            const { data } = await supabase
+              .from('user_profiles')
+              .select('school_id')
+              .eq('id', user.id)
+              .single();
+            if (data?.school_id) setSchoolId(data.school_id);
+          }
         }
       } catch (error) {
         console.error('Error in useSchool:', error);

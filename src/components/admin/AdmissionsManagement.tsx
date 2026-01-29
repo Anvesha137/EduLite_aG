@@ -73,13 +73,12 @@ export default function AdmissionsManagement() {
     getUser();
   }, []);
 
-  const [activeTab, setActiveTab] = useState<'leads' | 'applications' | 'analytics'>('leads');
+  const [activeTab, setActiveTab] = useState<'leads' | 'applications' | 'analytics' | 'counsellors'>('leads');
   const [leads, setLeads] = useState<Lead[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
+  const [counsellors, setCounsellors] = useState<any[]>([]);
   const [funnelStages, setFunnelStages] = useState<FunnelStage[]>([]);
   const [leadSources, setLeadSources] = useState<LeadSource[]>([]);
-  const [classes, setClasses] = useState<Class[]>([]);
-  const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -88,9 +87,10 @@ export default function AdmissionsManagement() {
   const [filterSource, setFilterSource] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [selectedApplication, setSelectedApplication] = useState<Application | null>(null);
   const [showLeadModal, setShowLeadModal] = useState(false);
   const [showVisitModal, setShowVisitModal] = useState(false);
-  const [showApplicationModal, setShowApplicationModal] = useState(false);
+  const [showAppModal, setShowAppModal] = useState(false);
 
   const [leadForm, setLeadForm] = useState({
     parent_name: '',
@@ -140,9 +140,9 @@ export default function AdmissionsManagement() {
       loadData();
       loadFunnelStages();
       loadLeadSources();
-      loadClasses();
+      // loadClasses(); // Removed
     } else if (!schoolLoading && !schoolId) {
-      setLoading(false);
+      // setLoading(false); // Removed
     }
   }, [schoolId, schoolLoading]);
 
@@ -172,15 +172,18 @@ export default function AdmissionsManagement() {
       loadLeads();
     } else if (activeTab === 'applications') {
       loadApplications();
+    } else if (activeTab === 'counsellors') {
+      loadCounsellors();
     }
   }, [activeTab, filterStage, filterStatus, filterSource]);
 
+  // Renamed to avoid conflicts if needed, but simplified
   const loadData = async () => {
-    setLoading(true);
+    // setLoading(true); // Removed
     try {
-      await Promise.all([loadLeads(), loadApplications()]);
+      await Promise.all([loadLeads(), loadApplications(), loadCounsellors()]);
     } finally {
-      setLoading(false);
+      // setLoading(false); // Removed
     }
   };
 
@@ -197,23 +200,17 @@ export default function AdmissionsManagement() {
 
 
 
-  const loadClasses = async () => {
-    const { data } = await supabase
-      .from('classes')
-      .select('id, grade, grade_order')
-      .eq('school_id', schoolId)
-      .order('grade_order');
+  // Class loader removed as 'classes' state is unused
 
-    if (data && data.length > 0) {
-      setClasses(data);
-    } else {
-      // MOCK DATA for Class Dropdown
-      setClasses([
-        { id: 'mk-c-1', grade: 'Grade 10', grade_order: 10 },
-        { id: 'mk-c-2', grade: 'Grade 11', grade_order: 11 },
-        { id: 'mk-c-3', grade: 'Grade 12', grade_order: 12 },
-        { id: 'mk-c-4', grade: 'Grade 9', grade_order: 9 },
-      ] as any);
+  // Class loader removed as 'classes' state is unused
+
+  const loadCounsellors = async () => {
+    try {
+      const { data, error } = await supabase.rpc('get_admission_counsellors_analytics', { p_school_id: schoolId });
+      if (error) throw error;
+      if (data) setCounsellors(data);
+    } catch (err) {
+      console.error('Error loading counsellors:', err);
     }
   };
 
@@ -427,6 +424,25 @@ export default function AdmissionsManagement() {
       concerns_raised: '',
       notes: ''
     });
+  };
+
+  const handleApplicationAction = async (appId: string, status: 'approved' | 'rejected') => {
+    if (!confirm(`Are you sure you want to ${status} this application?`)) return;
+
+    try {
+      const { error } = await supabase.rpc('update_application_status', {
+        p_application_id: appId,
+        p_status: status
+      });
+
+      if (error) throw error;
+
+      setMessage({ type: 'success', text: `Application ${status} successfully` });
+      loadApplications();
+    } catch (err: any) {
+      console.error('Error updating application:', err);
+      setMessage({ type: 'error', text: err.message });
+    }
   };
 
   const filteredLeads = leads.filter(lead => {
@@ -752,6 +768,10 @@ export default function AdmissionsManagement() {
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-center gap-2">
                           <button
+                            onClick={() => {
+                              setSelectedApplication(app);
+                              setShowAppModal(true);
+                            }}
                             className="p-1.5 hover:bg-blue-50 text-blue-600 rounded transition-colors"
                             title="View Details"
                           >
@@ -760,12 +780,14 @@ export default function AdmissionsManagement() {
                           {isAdmin && app.decision_status === 'pending' && (
                             <>
                               <button
+                                onClick={() => handleApplicationAction(app.id, 'approved')}
                                 className="p-1.5 hover:bg-green-50 text-green-600 rounded transition-colors"
                                 title="Approve"
                               >
                                 <CheckCircle className="w-4 h-4" />
                               </button>
                               <button
+                                onClick={() => handleApplicationAction(app.id, 'rejected')}
                                 className="p-1.5 hover:bg-red-50 text-red-600 rounded transition-colors"
                                 title="Reject"
                               >
@@ -785,6 +807,88 @@ export default function AdmissionsManagement() {
                   No applications found
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'counsellors' && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="bg-white rounded-lg border border-slate-200 p-6">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-slate-600">Total Counsellors</span>
+                <Users className="w-5 h-5 text-blue-600" />
+              </div>
+              <p className="text-3xl font-bold text-slate-900">{counsellors.length}</p>
+            </div>
+            <div className="bg-white rounded-lg border border-slate-200 p-6">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-slate-600">Top Performer</span>
+                <TrendingUp className="w-5 h-5 text-green-600" />
+              </div>
+              <p className="text-xl font-bold text-slate-900 truncate">
+                {counsellors.length > 0 ? counsellors[0].counselor_name : '-'}
+              </p>
+              <p className="text-xs text-slate-500 mt-1">Based on conversions</p>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+            <div className="px-6 py-4 border-b border-slate-200">
+              <h3 className="text-lg font-bold text-slate-900">Counsellor Performance</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-slate-50 border-b border-slate-200">
+                  <tr>
+                    <th className="text-left px-6 py-3 text-sm font-semibold text-slate-900">Counsellor Name</th>
+                    <th className="text-left px-6 py-3 text-sm font-semibold text-slate-900">Total Leads</th>
+                    <th className="text-left px-6 py-3 text-sm font-semibold text-slate-900">Active Leads</th>
+                    <th className="text-left px-6 py-3 text-sm font-semibold text-slate-900">Converted</th>
+                    <th className="text-left px-6 py-3 text-sm font-semibold text-slate-900">Conversion Rate</th>
+                    <th className="text-left px-6 py-3 text-sm font-semibold text-slate-900">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-200">
+                  {counsellors.map((c, index) => (
+                    <tr key={index} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs uppercase">
+                            {c.counselor_name ? c.counselor_name.charAt(0) : 'U'}
+                          </div>
+                          <span className="text-sm font-medium text-slate-900">{c.counselor_name || 'Unknown'}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-slate-900">{c.total_leads}</td>
+                      <td className="px-6 py-4 text-sm text-slate-900">{c.active_leads}</td>
+                      <td className="px-6 py-4 text-sm text-green-600 font-medium">{c.converted_leads}</td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <div className="w-16 bg-slate-200 rounded-full h-1.5">
+                            <div
+                              className="bg-green-500 h-1.5 rounded-full"
+                              style={{ width: `${c.conversion_rate}%` }}
+                            />
+                          </div>
+                          <span className="text-sm text-slate-600">{c.conversion_rate}%</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">Active</span>
+                      </td>
+                    </tr>
+                  ))}
+                  {counsellors.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
+                        No counsellor data available yet.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -1336,6 +1440,85 @@ export default function AdmissionsManagement() {
             </button>
           </div>
         </form>
+      </Modal>
+
+      <Modal
+        isOpen={showAppModal}
+        onClose={() => {
+          setShowAppModal(false);
+          setSelectedApplication(null);
+        }}
+        title={`Application - ${selectedApplication?.application_number}`}
+      >
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 gap-4 text-sm">
+            <div>
+              <p className="text-slate-500">Student Name</p>
+              <p className="font-medium text-slate-900">{selectedApplication?.student_name}</p>
+            </div>
+            <div>
+              <p className="text-slate-500">Parent Name</p>
+              <p className="font-medium text-slate-900">{selectedApplication?.parent_name}</p>
+            </div>
+            <div>
+              <p className="text-slate-500">Class</p>
+              <p className="font-medium text-slate-900">{selectedApplication?.applying_class?.grade}</p>
+            </div>
+            <div>
+              <p className="text-slate-500">Contact</p>
+              <p className="font-medium text-slate-900">{selectedApplication?.contact_number}</p>
+            </div>
+            <div>
+              <p className="text-slate-500">Lead Number</p>
+              <p className="font-medium text-slate-900">{selectedApplication?.lead?.lead_number}</p>
+            </div>
+            <div>
+              <p className="text-slate-500">Date</p>
+              <p className="font-medium text-slate-900">
+                {selectedApplication ? formatDate(selectedApplication.application_date) : '-'}
+              </p>
+            </div>
+          </div>
+
+          <div className="pt-4 border-t border-slate-200">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <p className="text-sm text-slate-500 mb-1">Current Status</p>
+                <span className={`px-2 py-1 rounded-full text-xs font-medium capitalize ${selectedApplication ? getDecisionColor(selectedApplication?.decision_status) : ''
+                  }`}>
+                  {selectedApplication?.decision_status}
+                </span>
+              </div>
+            </div>
+
+            {selectedApplication?.decision_status === 'pending' && isAdmin && (
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    if (selectedApplication) {
+                      handleApplicationAction(selectedApplication.id, 'approved');
+                      setShowAppModal(false);
+                    }
+                  }}
+                  className="flex-1 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium text-sm"
+                >
+                  Approve Application
+                </button>
+                <button
+                  onClick={() => {
+                    if (selectedApplication) {
+                      handleApplicationAction(selectedApplication.id, 'rejected');
+                      setShowAppModal(false);
+                    }
+                  }}
+                  className="flex-1 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-medium text-sm"
+                >
+                  Reject Application
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
       </Modal>
     </div >
   );
