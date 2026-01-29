@@ -77,6 +77,7 @@ export default function AdmissionsManagement() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
   const [counsellors, setCounsellors] = useState<any[]>([]);
+  const [classes, setClasses] = useState<Class[]>([]);
   const [funnelStages, setFunnelStages] = useState<FunnelStage[]>([]);
   const [leadSources, setLeadSources] = useState<LeadSource[]>([]);
   const [saving, setSaving] = useState(false);
@@ -140,7 +141,7 @@ export default function AdmissionsManagement() {
       loadData();
       loadFunnelStages();
       loadLeadSources();
-      // loadClasses(); // Removed
+      loadClasses();
     } else if (!schoolLoading && !schoolId) {
       // setLoading(false); // Removed
     }
@@ -200,9 +201,14 @@ export default function AdmissionsManagement() {
 
 
 
-  // Class loader removed as 'classes' state is unused
-
-  // Class loader removed as 'classes' state is unused
+  const loadClasses = async () => {
+    const { data } = await supabase
+      .from('classes')
+      .select('id, grade')
+      .eq('school_id', schoolId)
+      .order('grade');
+    if (data) setClasses(data);
+  };
 
   const loadCounsellors = async () => {
     try {
@@ -302,21 +308,22 @@ export default function AdmissionsManagement() {
     setSaving(true);
 
     try {
-      if (!userId) {
-        throw new Error('User not authenticated');
-      }
+      // Allow unauthenticated creation
+      // if (!userId) {
+      //   throw new Error('User not authenticated');
+      // }
 
       const { data, error } = await supabase.rpc('create_admission_lead', {
         p_school_id: schoolId,
         p_parent_name: leadForm.parent_name,
         p_contact_number: leadForm.contact_number,
-        p_lead_source_id: leadForm.lead_source_id,
-        p_applying_class_id: leadForm.applying_class_id,
+        p_lead_source_id: leadForm.lead_source_id || null,
+        p_applying_class_id: leadForm.applying_class_id || null,
         p_academic_year: leadForm.academic_year,
         p_student_name: leadForm.student_name,
         p_priority: leadForm.priority,
         p_notes: leadForm.notes,
-        p_user_id: userId
+        p_user_id: userId || null
       });
 
       if (error) throw error;
@@ -337,9 +344,10 @@ export default function AdmissionsManagement() {
     setSaving(true);
 
     try {
-      if (!userId) {
-        throw new Error('User not authenticated');
-      }
+      // Allow unauthenticated logging
+      // if (!userId) {
+      //   throw new Error('User not authenticated');
+      // }
 
       const { error } = await supabase
         .from('admission_visits')
@@ -351,7 +359,7 @@ export default function AdmissionsManagement() {
           visit_time: visitForm.visit_time || null,
           duration_minutes: visitForm.duration_minutes ? parseInt(visitForm.duration_minutes) : null,
           people_met: visitForm.people_met || null,
-          counselor_id: userId,
+          counselor_id: userId || null,
           outcome: visitForm.outcome,
           interest_level: visitForm.interest_level,
           followup_required: visitForm.followup_required,
@@ -359,7 +367,7 @@ export default function AdmissionsManagement() {
           discussion_points: visitForm.discussion_points || null,
           concerns_raised: visitForm.concerns_raised || null,
           notes: visitForm.notes || null,
-          created_by: userId
+          created_by: userId || null
         });
 
       if (error) throw error;
@@ -370,7 +378,7 @@ export default function AdmissionsManagement() {
           .update({
             next_followup_date: visitForm.next_followup_date,
             last_contacted_at: new Date().toISOString(),
-            updated_by: userId
+            updated_by: userId || null
           })
           .eq('id', selectedLead?.id);
       }
@@ -1074,9 +1082,15 @@ export default function AdmissionsManagement() {
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
               >
                 <option value="">Select Class</option>
-                {GRADE_LEVELS.map(grade => (
-                  <option key={grade} value={grade}>{grade}</option>
-                ))}
+                {classes.length > 0 ? (
+                  classes.map(cls => (
+                    <option key={cls.id} value={cls.id}>{cls.grade}</option>
+                  ))
+                ) : (
+                  GRADE_LEVELS.map(grade => (
+                    <option key={grade} value={grade}>{grade}</option>
+                  ))
+                )}
               </select>
             </div>
 

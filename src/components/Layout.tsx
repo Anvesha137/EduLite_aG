@@ -21,16 +21,14 @@ export function Layout({ children, title, navigation }: LayoutProps) {
   return (
     <div className="min-h-screen bg-slate-50">
       <div
-        className={`fixed inset-0 bg-slate-900/50 z-20 lg:hidden transition-opacity ${
-          sidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        }`}
+        className={`fixed inset-0 bg-slate-900/50 z-20 lg:hidden transition-opacity ${sidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          }`}
         onClick={() => setSidebarOpen(false)}
       />
 
       <aside
-        className={`fixed inset-y-0 left-0 z-30 w-64 bg-white border-r border-slate-200 transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        className={`fixed inset-y-0 left-0 z-30 w-64 bg-white border-r border-slate-200 transform transition-transform duration-300 ease-in-out lg:translate-x-0 flex flex-col ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
       >
         <div className="flex items-center justify-between h-16 px-6 border-b border-slate-200">
           <div className="flex items-center gap-2">
@@ -47,18 +45,17 @@ export function Layout({ children, title, navigation }: LayoutProps) {
           </button>
         </div>
 
-        <nav className="p-4 space-y-1">
+        <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
           {navigation.map((item) => {
             const Icon = item.icon;
             return (
               <button
                 key={item.name}
                 onClick={item.onClick}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                  item.active
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${item.active
                     ? 'bg-blue-50 text-blue-700 font-medium'
                     : 'text-slate-600 hover:bg-slate-50'
-                }`}
+                  }`}
               >
                 <Icon className="w-5 h-5" />
                 <span>{item.name}</span>
@@ -67,7 +64,7 @@ export function Layout({ children, title, navigation }: LayoutProps) {
           })}
         </nav>
 
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-slate-200">
+        <div className="p-4 border-t border-slate-200 flex-none">
           <div className="flex items-center gap-3 px-4 py-3 mb-2 bg-slate-50 rounded-lg">
             <div className="w-10 h-10 bg-gradient-to-br from-slate-400 to-slate-600 rounded-full flex items-center justify-center text-white font-medium">
               {role?.charAt(0) || 'U'}
