@@ -364,10 +364,11 @@ export default function AdmissionsManagement() {
 
       if (error) throw error;
 
-      setMessage({ type: 'success', text: `Lead created successfully!` });
+      setMessage({ type: 'success', text: 'Lead created successfully' });
+      loadLeads();
+      loadApplications(); // Refresh applications as they are auto-created now
       setShowLeadModal(false);
       resetLeadForm();
-      loadLeads();
     } catch (error: any) {
       setMessage({ type: 'error', text: error.message });
     } finally {
