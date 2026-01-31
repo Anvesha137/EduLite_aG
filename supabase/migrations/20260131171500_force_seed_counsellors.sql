@@ -4,7 +4,7 @@
 -- Enable pgcrypto for password hashing
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
--- Set search path to ensure gen_salt is found (often in extensions schema)
+-- Set search path to ensure gen_salt is found
 SET search_path = public, extensions;
 
 DO $$
@@ -12,7 +12,6 @@ DECLARE
   v_school_id uuid;
   v_role_id uuid;
   v_user_id uuid;
-  existing_counselor_count integer;
 BEGIN
   -- Get School ID
   SELECT id INTO v_school_id FROM schools LIMIT 1;
@@ -31,8 +30,8 @@ BEGIN
     VALUES (gen_random_uuid(), 'anjali@demo.com', crypt('password123', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{}', now(), now())
     RETURNING id INTO v_user_id;
 
-    INSERT INTO public.user_profiles (id, email, full_name, role_id, school_id, is_active)
-    VALUES (v_user_id, 'anjali@demo.com', 'Anjali Sharma', v_role_id, v_school_id, true);
+    INSERT INTO public.user_profiles (id, full_name, role_id, school_id, is_active)
+    VALUES (v_user_id, 'Anjali Sharma', v_role_id, v_school_id, true);
   END IF;
 
   -- 2. Counselor Ravi
@@ -41,8 +40,8 @@ BEGIN
     VALUES (gen_random_uuid(), 'ravi@demo.com', crypt('password123', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{}', now(), now())
     RETURNING id INTO v_user_id;
 
-    INSERT INTO public.user_profiles (id, email, full_name, role_id, school_id, is_active)
-    VALUES (v_user_id, 'ravi@demo.com', 'Ravi Kumar', v_role_id, v_school_id, true);
+    INSERT INTO public.user_profiles (id, full_name, role_id, school_id, is_active)
+    VALUES (v_user_id, 'Ravi Kumar', v_role_id, v_school_id, true);
   END IF;
 
   -- 3. Counselor Sneha
@@ -51,8 +50,8 @@ BEGIN
     VALUES (gen_random_uuid(), 'sneha@demo.com', crypt('password123', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{}', now(), now())
     RETURNING id INTO v_user_id;
 
-    INSERT INTO public.user_profiles (id, email, full_name, role_id, school_id, is_active)
-    VALUES (v_user_id, 'sneha@demo.com', 'Sneha Patel', v_role_id, v_school_id, true);
+    INSERT INTO public.user_profiles (id, full_name, role_id, school_id, is_active)
+    VALUES (v_user_id, 'Sneha Patel', v_role_id, v_school_id, true);
   END IF;
 
   -- 4. Counselor Amit
@@ -61,8 +60,8 @@ BEGIN
     VALUES (gen_random_uuid(), 'amit@demo.com', crypt('password123', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{}', now(), now())
     RETURNING id INTO v_user_id;
 
-    INSERT INTO public.user_profiles (id, email, full_name, role_id, school_id, is_active)
-    VALUES (v_user_id, 'amit@demo.com', 'Amit Verma', v_role_id, v_school_id, true);
+    INSERT INTO public.user_profiles (id, full_name, role_id, school_id, is_active)
+    VALUES (v_user_id, 'Amit Verma', v_role_id, v_school_id, true);
   END IF;
 
   -- 5. Counselor Priya
@@ -71,8 +70,8 @@ BEGIN
     VALUES (gen_random_uuid(), 'priya@demo.com', crypt('password123', gen_salt('bf')), now(), '{"provider":"email","providers":["email"]}', '{}', now(), now())
     RETURNING id INTO v_user_id;
 
-    INSERT INTO public.user_profiles (id, email, full_name, role_id, school_id, is_active)
-    VALUES (v_user_id, 'priya@demo.com', 'Priya Singh', v_role_id, v_school_id, true);
+    INSERT INTO public.user_profiles (id, full_name, role_id, school_id, is_active)
+    VALUES (v_user_id, 'Priya Singh', v_role_id, v_school_id, true);
   END IF;
 
 END $$;

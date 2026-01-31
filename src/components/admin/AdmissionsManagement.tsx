@@ -343,6 +343,8 @@ export default function AdmissionsManagement() {
       return;
     }
 
+    // Removed Counselor Validation as it is now optional per user request
+
     setSaving(true);
 
     try {
@@ -1150,10 +1152,9 @@ export default function AdmissionsManagement() {
 
             <div className="col-span-1 md:col-span-2">
               <label className="block text-sm font-medium text-slate-700 mb-1">
-                Assign Counsellor *
+                Assign Counsellor
               </label>
               <select
-                required
                 value={leadForm.assigned_counselor_id}
                 onChange={(e) => setLeadForm({ ...leadForm, assigned_counselor_id: e.target.value })}
                 className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
