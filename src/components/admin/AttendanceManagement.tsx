@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
-import { Save, Upload } from 'lucide-react';
+import { Save, Upload, Download } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useSchool } from '../../hooks/useSchool';
+import { useAuth } from '../../contexts/AuthContext';
 import { Student, Class, Section } from '../../types/database';
 import { Modal } from '../Modal';
 import { CSVUpload } from '../CSVUpload';
 
 export function AttendanceManagement() {
   const { schoolId } = useSchool();
+  const { role } = useAuth();
   const [students, setStudents] = useState<Student[]>([]);
   const [classes, setClasses] = useState<Class[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
@@ -22,8 +24,40 @@ export function AttendanceManagement() {
   useEffect(() => {
     if (schoolId) {
       loadClasses();
+      if (role === 'EDUCATOR') {
+        loadTeacherAssignment();
+      }
     }
-  }, [schoolId]);
+  }, [schoolId, role]);
+
+  const loadTeacherAssignment = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: educator } = await supabase
+        .from('educators')
+        .select('id')
+        .eq('user_id', user.id)
+        .single();
+
+      if (educator) {
+        const { data: assignment } = await supabase
+          .from('educator_class_assignments')
+          .select('class_id, section_id')
+          .eq('educator_id', educator.id)
+          .eq('is_class_teacher', true)
+          .single();
+
+        if (assignment) {
+          setSelectedClass(assignment.class_id);
+          setSelectedSection(assignment.section_id);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading teacher assignment:', error);
+    }
+  };
 
   useEffect(() => {
     if (selectedClass && selectedSection && selectedDate) {
@@ -167,6 +201,38 @@ export function AttendanceManagement() {
     return { success: successCount, errors };
   };
 
+  const exportToCSV = () => {
+    if (students.length === 0) return;
+
+    // Create CSV content
+    const headers = ['Roll No', 'Admission No', 'Student Name', 'Status', 'Date'];
+    const rows = students.map((s, idx) => [
+      idx + 1,
+      s.admission_number,
+      s.name,
+      attendance[s.id] || 'present',
+      selectedDate
+    ]);
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.join(','))
+    ].join('\n');
+
+    // Create download link
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    if (link.download !== undefined) {
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      link.setAttribute('download', `attendance_${selectedClass}_${selectedSection}_${selectedDate}.csv`);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+  };
+
   const classSections = sections.filter(s => s.class_id === selectedClass);
 
   return (
@@ -176,6 +242,14 @@ export function AttendanceManagement() {
         <div className="flex items-center gap-3">
           {students.length > 0 && (
             <>
+              <button
+                onClick={exportToCSV}
+                className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-lg font-medium transition-colors"
+                title="Download CSV"
+              >
+                <Download className="w-4 h-4" />
+                Export
+              </button>
               <button
                 onClick={() => setShowBulkModal(true)}
                 className="flex items-center gap-2 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition-colors"
@@ -217,7 +291,8 @@ export function AttendanceManagement() {
             <select
               value={selectedClass}
               onChange={(e) => { setSelectedClass(e.target.value); setSelectedSection(''); }}
-              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              disabled={role === 'EDUCATOR' && !!selectedClass}
+              className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-slate-100"
             >
               <option value="">Select Class</option>
               {classes.map(cls => (
@@ -233,7 +308,7 @@ export function AttendanceManagement() {
             <select
               value={selectedSection}
               onChange={(e) => setSelectedSection(e.target.value)}
-              disabled={!selectedClass}
+              disabled={!selectedClass || (role === 'EDUCATOR' && !!selectedSection)}
               className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-slate-100"
             >
               <option value="">Select Section</option>

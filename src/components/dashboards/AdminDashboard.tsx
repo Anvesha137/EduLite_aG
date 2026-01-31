@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useAuth } from '../../contexts/AuthContext';
 import { Layout } from '../Layout';
 import {
   LayoutDashboard,
@@ -40,6 +41,7 @@ type View = 'dashboard' | 'students' | 'educators' | 'attendance' | 'exams' | 'f
 const STORAGE_KEY = 'admin_current_view';
 
 export function AdminDashboard() {
+  const { role } = useAuth();
   const { schoolId, loading: schoolLoading } = useSchool();
   const [currentView, setCurrentView] = useState<View>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -85,7 +87,7 @@ export function AdminDashboard() {
     }
   };
 
-  const navigation = [
+  const allNavigation = [
     { name: 'Dashboard', icon: LayoutDashboard, active: currentView === 'dashboard', onClick: () => setCurrentView('dashboard') },
     { name: 'Students', icon: Users, active: currentView === 'students', onClick: () => setCurrentView('students') },
     { name: 'Educators', icon: GraduationCap, active: currentView === 'educators', onClick: () => setCurrentView('educators') },
@@ -100,6 +102,16 @@ export function AdminDashboard() {
     { name: 'Reports', icon: FileText, active: currentView === 'reports', onClick: () => setCurrentView('reports') },
     { name: 'Settings', icon: Settings, active: currentView === 'settings', onClick: () => setCurrentView('settings') },
   ];
+
+  const navigation = role === 'COUNSELOR'
+    ? allNavigation.filter(n => n.name === 'Admissions')
+    : allNavigation;
+
+  useEffect(() => {
+    if (role === 'COUNSELOR' && currentView !== 'admissions') {
+      setCurrentView('admissions');
+    }
+  }, [role, currentView]);
 
   const attendanceRate = students.length > 0
     ? Math.round((todayAttendance.filter(a => a.status === 'present').length / students.length) * 100)

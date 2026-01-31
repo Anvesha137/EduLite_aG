@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { useAuth } from '../../contexts/AuthContext';
 import { useSchool } from '../../hooks/useSchool';
 import {
   UserPlus, FileText, CheckCircle, XCircle, Clock,
@@ -60,8 +61,10 @@ interface Class {
 
 export default function AdmissionsManagement() {
   const { schoolId, loading: schoolLoading } = useSchool();
+  const { role } = useAuth();
   const [userId, setUserId] = useState<string>('');
-  const isAdmin = true;
+  const isAdmin = ['SUPERADMIN', 'ADMIN'].includes(role || '');
+  const [counselorOptions, setCounselorOptions] = useState<any[]>([]);
 
   useEffect(() => {
     const getUser = async () => {
@@ -73,7 +76,7 @@ export default function AdmissionsManagement() {
     getUser();
   }, []);
 
-  const [activeTab, setActiveTab] = useState<'leads' | 'applications' | 'analytics' | 'counsellors'>('leads');
+  const [activeTab, setActiveTab] = useState<'leads' | 'applications' | 'analytics' | 'counsellors'>('applications');
   const [leads, setLeads] = useState<Lead[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
   const [counsellors, setCounsellors] = useState<any[]>([]);
@@ -108,7 +111,8 @@ export default function AdmissionsManagement() {
     previous_school: '',
     address: '',
     referral_code: '',
-    referral_type: 'student' as 'student' | 'staff' | 'other'
+    referral_type: 'student' as 'student' | 'staff' | 'other',
+    assigned_counselor_id: ''
   });
 
   const [referralValidation, setReferralValidation] = useState<{
@@ -142,6 +146,7 @@ export default function AdmissionsManagement() {
       loadFunnelStages();
       loadLeadSources();
       loadClasses();
+      loadCounselorOptions();
     } else if (!schoolLoading && !schoolId) {
       // setLoading(false); // Removed
     }
@@ -165,6 +170,16 @@ export default function AdmissionsManagement() {
         defaults.map(name => ({ school_id: schoolId, name, type: 'other', is_active: true }))
       ).select();
       if (newSources) setLeadSources(newSources);
+    }
+  };
+
+  const loadCounselorOptions = async () => {
+    try {
+      const { data, error } = await supabase.rpc('get_available_counsellors', { p_school_id: schoolId });
+      if (error) throw error;
+      if (data) setCounselorOptions(data);
+    } catch (err) {
+      console.error('Error loading counselor options:', err);
     }
   };
 
@@ -305,14 +320,32 @@ export default function AdmissionsManagement() {
 
   const handleCreateLead = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Validation
+    const nameRegex = /^[^0-9]*$/;
+    const phoneRegex = /^\d+$/;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!nameRegex.test(leadForm.parent_name)) {
+      setMessage({ type: 'error', text: 'Parent Name should not contain numbers' });
+      return;
+    }
+    if (leadForm.student_name && !nameRegex.test(leadForm.student_name)) {
+      setMessage({ type: 'error', text: 'Student Name should not contain numbers' });
+      return;
+    }
+    if (!phoneRegex.test(leadForm.contact_number)) {
+      setMessage({ type: 'error', text: 'Phone number should only contain digits' });
+      return;
+    }
+    if (leadForm.contact_email && !emailRegex.test(leadForm.contact_email)) {
+      setMessage({ type: 'error', text: 'Invalid email address' });
+      return;
+    }
+
     setSaving(true);
 
     try {
-      // Allow unauthenticated creation
-      // if (!userId) {
-      //   throw new Error('User not authenticated');
-      // }
-
       const { data, error } = await supabase.rpc('create_admission_lead', {
         p_school_id: schoolId,
         p_parent_name: leadForm.parent_name,
@@ -323,7 +356,8 @@ export default function AdmissionsManagement() {
         p_student_name: leadForm.student_name,
         p_priority: leadForm.priority,
         p_notes: leadForm.notes,
-        p_user_id: userId || null
+        p_user_id: userId || null, // Creator/Fallback counselor
+        p_assigned_counselor_id: leadForm.assigned_counselor_id || null // Explicit selection
       });
 
       if (error) throw error;
@@ -412,7 +446,8 @@ export default function AdmissionsManagement() {
       previous_school: '',
       address: '',
       referral_code: '',
-      referral_type: 'student'
+      referral_type: 'student',
+      assigned_counselor_id: ''
     });
     setReferralValidation(null);
   };
@@ -517,10 +552,10 @@ export default function AdmissionsManagement() {
       <div className="border-b border-slate-200">
         <div className="flex gap-4">
           {[
-            { id: 'leads', label: 'Leads & Funnel', icon: Users },
             { id: 'applications', label: 'Applications', icon: FileText },
-            { id: 'counsellors', label: 'Admission Counsellors', icon: Users },
-            { id: 'analytics', label: 'Analytics', icon: TrendingUp }
+            { id: 'analytics', label: 'Analytics', icon: TrendingUp },
+            { id: 'leads', label: 'Leads & Funnel', icon: Users },
+            { id: 'counsellors', label: 'Admission Counsellors', icon: Users }
           ].map(tab => (
             <button
               key={tab.id}
@@ -1110,6 +1145,26 @@ export default function AdmissionsManagement() {
                   <option value="urgent">Urgent</option>
                 </select>
               </div>
+            </div>
+
+
+            <div className="col-span-1 md:col-span-2">
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Assign Counsellor *
+              </label>
+              <select
+                required
+                value={leadForm.assigned_counselor_id}
+                onChange={(e) => setLeadForm({ ...leadForm, assigned_counselor_id: e.target.value })}
+                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="">Select Counsellor</option>
+                {counselorOptions.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.full_name} ({c.role})
+                  </option>
+                ))}
+              </select>
             </div>
 
             {leadSources.find(s => s.id === leadForm.lead_source_id)?.name === 'Student/Staff Referral' && (

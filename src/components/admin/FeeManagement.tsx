@@ -626,11 +626,17 @@ function InstallmentsModal({ isOpen, onClose, studentFee, onPaymentSuccess, scho
 
   const loadInstallments = async () => {
     try {
+      setLoading(true);
+      // Use fee_installments table directly
       const { data, error } = await supabase
-        .from('student_fee_installments_v2')
+        .from('fee_installments')
         .select('*')
-        .eq('student_fee_id', studentFee.id)
-        .order('installment_number');
+        // fee_installments has student_id, but the modal might be linked via student_fee_id?
+        // My migration schema uses fee_installments(student_id).
+        // The modal has studentFee object. check if it has student_id. It does.
+        .eq('student_id', studentFee.student_id)
+        .eq('academic_year', '2024-25')
+        .order('due_date');
 
       if (error) throw error;
       setInstallments(data || []);
@@ -1030,6 +1036,34 @@ interface ReceiptModalProps {
 }
 
 function ReceiptModal({ isOpen, onClose, studentFee, schoolId }: ReceiptModalProps) {
+  const [installments, setInstallments] = useState<InstallmentData[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (isOpen && studentFee) {
+      fetchInstallments();
+    }
+  }, [isOpen, studentFee]);
+
+  const fetchInstallments = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('fee_installments')
+        .select('*')
+        .eq('student_id', studentFee.student_id)
+        .eq('academic_year', '2024-25') // Hardcoded for now based on context
+        .order('due_date');
+
+      if (error) throw error;
+      setInstallments(data || []);
+    } catch (err) {
+      console.error('Error fetching installments for receipt:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={`Fee Receipt - ${studentFee.student_name}`} size="lg">
       <div className="space-y-6">
@@ -1037,7 +1071,8 @@ function ReceiptModal({ isOpen, onClose, studentFee, schoolId }: ReceiptModalPro
           <div className="flex justify-between items-start">
             <div>
               <h3 className="font-bold text-lg text-slate-900">Fee Receipt</h3>
-              <p className="text-sm text-slate-500">Date: {new Date().toLocaleDateString()}</p>
+              <p className="text-sm text-slate-500">Date: {new Date().toLocaleDateString('en-IN')}</p>
+              <p className="text-sm text-slate-500">Academic Year: 2024-25</p>
             </div>
             <div className="text-right">
               <p className="font-bold text-slate-900">{studentFee.student_name}</p>
@@ -1048,6 +1083,7 @@ function ReceiptModal({ isOpen, onClose, studentFee, schoolId }: ReceiptModalPro
         </div>
 
         <div className="bg-slate-50 p-4 rounded-lg border border-slate-200">
+          <h4 className="font-semibold text-sm text-slate-900 mb-3">Payment Summary</h4>
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div className="flex justify-between">
               <span className="text-slate-600">Total Fee Applicable</span>
@@ -1066,6 +1102,52 @@ function ReceiptModal({ isOpen, onClose, studentFee, schoolId }: ReceiptModalPro
               <span className="font-medium text-red-700">{formatCurrency(studentFee.pending_amount)}</span>
             </div>
           </div>
+        </div>
+
+        {/* Installments Breakdown */}
+        <div>
+          <h4 className="font-semibold text-sm text-slate-900 mb-3">Installment Breakdown</h4>
+          {loading ? (
+            <p className="text-xs text-slate-500">Loading details...</p>
+          ) : (
+            <div className="overflow-hidden border border-slate-200 rounded-lg">
+              <table className="min-w-full divide-y divide-slate-200">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase">Installment</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase">Due Date</th>
+                    <th className="px-4 py-2 text-right text-xs font-medium text-slate-500 uppercase">Amount</th>
+                    <th className="px-4 py-2 text-right text-xs font-medium text-slate-500 uppercase">Paid</th>
+                    <th className="px-4 py-2 text-right text-xs font-medium text-slate-500 uppercase">Pending</th>
+                    <th className="px-4 py-2 text-center text-xs font-medium text-slate-500 uppercase">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-slate-200">
+                  {installments.map((inst, idx) => (
+                    <tr key={inst.id || idx}>
+                      <td className="px-4 py-2 text-sm text-slate-900">Installment {idx + 1}</td>
+                      <td className="px-4 py-2 text-sm text-slate-600">{new Date(inst.due_date).toLocaleDateString('en-IN')}</td>
+                      <td className="px-4 py-2 text-sm text-right font-medium">{formatCurrency(inst.amount)}</td>
+                      <td className="px-4 py-2 text-sm text-right text-green-600">{formatCurrency(inst.paid_amount || 0)}</td>
+                      <td className="px-4 py-2 text-sm text-right text-red-600">{formatCurrency((inst.amount || 0) - (inst.paid_amount || 0))}</td>
+                      <td className="px-4 py-2 text-sm text-center">
+                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${(inst.paid_amount || 0) >= inst.amount ? 'bg-green-100 text-green-700' :
+                          (inst.paid_amount || 0) > 0 ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'
+                          }`}>
+                          {(inst.paid_amount || 0) >= inst.amount ? 'Paid' : (inst.paid_amount || 0) > 0 ? 'Partial' : 'Pending'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                  {installments.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-4 text-center text-sm text-slate-500">No installments found</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
 
         <div className="flex justify-end gap-3 pt-4 no-print">
