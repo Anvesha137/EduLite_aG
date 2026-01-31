@@ -556,8 +556,7 @@ export default function AdmissionsManagement() {
           {[
             { id: 'applications', label: 'Applications', icon: FileText },
             { id: 'analytics', label: 'Analytics', icon: TrendingUp },
-            { id: 'leads', label: 'Leads & Funnel', icon: Users },
-            { id: 'counsellors', label: 'Admission Counsellors', icon: Users }
+            { id: 'leads', label: 'Leads & Funnel', icon: Users }
           ].map(tab => (
             <button
               key={tab.id}
@@ -857,87 +856,7 @@ export default function AdmissionsManagement() {
         </div>
       )}
 
-      {activeTab === 'counsellors' && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-white rounded-lg border border-slate-200 p-6">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-slate-600">Total Counsellors</span>
-                <Users className="w-5 h-5 text-blue-600" />
-              </div>
-              <p className="text-3xl font-bold text-slate-900">{counsellors.length}</p>
-            </div>
-            <div className="bg-white rounded-lg border border-slate-200 p-6">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-slate-600">Top Performer</span>
-                <TrendingUp className="w-5 h-5 text-green-600" />
-              </div>
-              <p className="text-xl font-bold text-slate-900 truncate">
-                {counsellors.length > 0 ? counsellors[0].counselor_name : '-'}
-              </p>
-              <p className="text-xs text-slate-500 mt-1">Based on conversions</p>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-200">
-              <h3 className="text-lg font-bold text-slate-900">Counsellor Performance</h3>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-slate-50 border-b border-slate-200">
-                  <tr>
-                    <th className="text-left px-6 py-3 text-sm font-semibold text-slate-900">Counsellor Name</th>
-                    <th className="text-left px-6 py-3 text-sm font-semibold text-slate-900">Total Leads</th>
-                    <th className="text-left px-6 py-3 text-sm font-semibold text-slate-900">Active Leads</th>
-                    <th className="text-left px-6 py-3 text-sm font-semibold text-slate-900">Converted</th>
-                    <th className="text-left px-6 py-3 text-sm font-semibold text-slate-900">Conversion Rate</th>
-                    <th className="text-left px-6 py-3 text-sm font-semibold text-slate-900">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200">
-                  {counsellors.map((c, index) => (
-                    <tr key={index} className="hover:bg-slate-50 transition-colors">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-xs uppercase">
-                            {c.counselor_name ? c.counselor_name.charAt(0) : 'U'}
-                          </div>
-                          <span className="text-sm font-medium text-slate-900">{c.counselor_name || 'Unknown'}</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-slate-900">{c.total_leads}</td>
-                      <td className="px-6 py-4 text-sm text-slate-900">{c.active_leads}</td>
-                      <td className="px-6 py-4 text-sm text-green-600 font-medium">{c.converted_leads}</td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <div className="w-16 bg-slate-200 rounded-full h-1.5">
-                            <div
-                              className="bg-green-500 h-1.5 rounded-full"
-                              style={{ width: `${c.conversion_rate}%` }}
-                            />
-                          </div>
-                          <span className="text-sm text-slate-600">{c.conversion_rate}%</span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">Active</span>
-                      </td>
-                    </tr>
-                  ))}
-                  {counsellors.length === 0 && (
-                    <tr>
-                      <td colSpan={6} className="px-6 py-12 text-center text-slate-500">
-                        No counsellor data available yet.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Counsellor Tab Removed */}
 
       {activeTab === 'analytics' && (
         <div className="space-y-6">
@@ -1150,23 +1069,7 @@ export default function AdmissionsManagement() {
             </div>
 
 
-            <div className="col-span-1 md:col-span-2">
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Assign Counsellor
-              </label>
-              <select
-                value={leadForm.assigned_counselor_id}
-                onChange={(e) => setLeadForm({ ...leadForm, assigned_counselor_id: e.target.value })}
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="">Select Counsellor</option>
-                {counselorOptions.map(c => (
-                  <option key={c.id} value={c.id}>
-                    {c.full_name} ({c.role})
-                  </option>
-                ))}
-              </select>
-            </div>
+            {/* Assign Counsellor Removed */}
 
             {leadSources.find(s => s.id === leadForm.lead_source_id)?.name === 'Student/Staff Referral' && (
               <div className="col-span-1 md:col-span-2 bg-slate-50 p-4 rounded-lg border border-slate-200">
