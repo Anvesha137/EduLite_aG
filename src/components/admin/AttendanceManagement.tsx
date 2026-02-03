@@ -195,8 +195,8 @@ export function AttendanceManagement() {
             continue;
           }
 
-          if (!row.status || !['present', 'absent', 'holiday'].includes(row.status)) {
-            errors.push(`Row ${i + 2}: Invalid status (must be present, absent, holiday)`);
+          if (!row.status || !['present', 'absent', 'holiday', 'late'].includes(row.status)) {
+            errors.push(`Row ${i + 2}: Invalid status (must be present, absent, holiday, late)`);
             continue;
           }
 
@@ -410,6 +410,17 @@ export function AttendanceManagement() {
                       />
                     </div>
                   </th>
+                  <th className="text-center px-6 py-4 text-sm font-semibold text-slate-900">
+                    <div className="flex flex-col items-center gap-2">
+                      <span>Late</span>
+                      <input
+                        type="checkbox"
+                        checked={areAll('late')}
+                        onChange={() => handleSelectAll('late')}
+                        className="w-4 h-4 rounded text-yellow-600 focus:ring-yellow-500"
+                      />
+                    </div>
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
@@ -447,6 +458,15 @@ export function AttendanceManagement() {
                         className="w-4 h-4 text-amber-500 focus:ring-amber-500"
                       />
                     </td>
+                    <td className="px-6 py-4 text-center">
+                      <input
+                        type="radio"
+                        name={`attendance-${student.id}`}
+                        checked={attendance[student.id] === 'late'}
+                        onChange={() => handleAttendanceChange(student.id, 'late')}
+                        className="w-4 h-4 text-yellow-600 focus:ring-yellow-500"
+                      />
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -476,7 +496,7 @@ export function AttendanceManagement() {
         />
         <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-4">
           <p className="text-sm text-amber-800">
-            <strong>Note:</strong> Status values: present, absent, holiday
+            <strong>Note:</strong> Status values: present, absent, holiday, late
           </p>
         </div>
       </Modal>

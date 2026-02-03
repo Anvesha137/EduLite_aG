@@ -71,18 +71,28 @@ export function ReceiptModal({ isOpen, onClose, studentFee, schoolId }: ReceiptM
                 .from('fee_payments')
                 .select(`
                     *,
-                    installment:fee_installments (
-                        installment_number,
-                        installment_name,
-                        due_date,
-                        status
-                    )
+                    installment_id
                 `)
                 .eq('student_fee_id', studentFee.id)
                 .order('payment_date', { ascending: false });
 
             if (transError) throw transError;
-            setTransactions(transData || []);
+
+            // Manual Join with Installments (instData)
+            const formattedTransactions = (transData || []).map((tx: any) => {
+                const linkedInst = (instData || []).find((i: any) => i.id === tx.installment_id);
+                return {
+                    ...tx,
+                    installment: linkedInst ? {
+                        installment_number: linkedInst.installment_number,
+                        installment_name: linkedInst.installment_name,
+                        due_date: linkedInst.due_date,
+                        status: linkedInst.status
+                    } : undefined
+                };
+            });
+
+            setTransactions(formattedTransactions);
 
         } catch (err) {
             console.error('Error fetching data for receipt:', err);
