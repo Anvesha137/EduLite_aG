@@ -20,6 +20,7 @@ interface SectionData {
     name: string;
     class_id: string;
     status: 'active' | 'archived';
+    student_count?: number;
 }
 
 interface SubjectData {
@@ -71,9 +72,11 @@ export function AcademicStructureTab() {
 
             if (classesError) throw classesError;
 
+            // Fetch sections with student count
+            // Note: 'students' is the relation name inferred from FK
             const { data: sectionsData, error: sectionsError } = await supabase
                 .from('sections')
-                .select('*')
+                .select('*, students(count)')
                 .eq('school_id', schoolId);
 
             if (sectionsError) throw sectionsError;
@@ -89,7 +92,13 @@ export function AcademicStructureTab() {
             // Combine
             const combined = classesData.map((cls: any) => ({
                 ...cls,
-                sections: sectionsData.filter((sec: any) => sec.class_id === cls.id)
+                sections: sectionsData
+                    .filter((sec: any) => sec.class_id === cls.id)
+                    .map((sec: any) => ({
+                        ...sec,
+                        student_count: sec.students ? sec.students[0]?.count : 0
+                    }))
+                    .sort((a: any, b: any) => a.name.localeCompare(b.name))
             }));
 
             setClasses(combined);
@@ -153,8 +162,8 @@ export function AcademicStructureTab() {
                 <button
                     onClick={() => setActiveSubTab('classes')}
                     className={`pb-2 px-4 font-medium transition-colors border-b-2 ${activeSubTab === 'classes'
-                            ? 'text-blue-600 border-blue-600'
-                            : 'text-slate-500 border-transparent hover:text-slate-700'
+                        ? 'text-blue-600 border-blue-600'
+                        : 'text-slate-500 border-transparent hover:text-slate-700'
                         }`}
                 >
                     Classes & Sections
@@ -162,8 +171,8 @@ export function AcademicStructureTab() {
                 <button
                     onClick={() => setActiveSubTab('subjects')}
                     className={`pb-2 px-4 font-medium transition-colors border-b-2 ${activeSubTab === 'subjects'
-                            ? 'text-blue-600 border-blue-600'
-                            : 'text-slate-500 border-transparent hover:text-slate-700'
+                        ? 'text-blue-600 border-blue-600'
+                        : 'text-slate-500 border-transparent hover:text-slate-700'
                         }`}
                 >
                     Subjects & Activities
@@ -202,9 +211,17 @@ export function AcademicStructureTab() {
                                             <span className="font-medium">{cls.name}</span>
                                         </div>
                                         <div className="col-span-2 text-center">
-                                            <span className="bg-slate-100 text-slate-600 px-2 py-1 rounded-full text-xs font-medium">
-                                                {cls.sections.length} Sections
-                                            </span>
+                                            {cls.sections.length > 0 ? (
+                                                <div className="flex flex-wrap justify-center gap-1">
+                                                    {cls.sections.map(sec => (
+                                                        <span key={sec.id} className="bg-slate-100 text-slate-600 px-2 py-1 rounded text-xs font-medium border border-slate-200" title={`${sec.student_count || 0} Students`}>
+                                                            {sec.name} <span className="text-slate-400">({sec.student_count || 0})</span>
+                                                        </span>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <span className="text-slate-400 text-xs italic">No Sections</span>
+                                            )}
                                         </div>
                                         <div className="col-span-2 text-center">
                                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${cls.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-600'
