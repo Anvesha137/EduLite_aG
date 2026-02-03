@@ -20,6 +20,7 @@ export function AttendanceManagement() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showBulkModal, setShowBulkModal] = useState(false);
+  const [holidayReason, setHolidayReason] = useState<string | null>(null);
 
   useEffect(() => {
     if (schoolId) {
@@ -81,6 +82,7 @@ export function AttendanceManagement() {
 
   const loadStudentsAndAttendance = async () => {
     setLoading(true);
+    setHolidayReason(null);
     try {
       const { data: studentsData } = await supabase
         .from('students')
@@ -98,6 +100,18 @@ export function AttendanceManagement() {
         .eq('date', selectedDate)
         .in('student_id', studentsData?.map(s => s.id) || []);
 
+      // Fetch holiday info
+      const { data: holidayData } = await supabase
+        .from('holidays')
+        .select('name')
+        .eq('school_id', schoolId)
+        .eq('date', selectedDate)
+        .single();
+
+      const isSunday = new Date(selectedDate).getDay() === 0;
+      let currentHoliday = holidayData?.name || (isSunday ? 'Sunday' : null);
+      setHolidayReason(currentHoliday);
+
       if (studentsData) setStudents(studentsData);
 
       const attendanceMap: Record<string, string> = {};
@@ -107,7 +121,8 @@ export function AttendanceManagement() {
 
       studentsData?.forEach(s => {
         if (!attendanceMap[s.id]) {
-          attendanceMap[s.id] = 'present';
+          // If holiday found and no record, default to holiday
+          attendanceMap[s.id] = currentHoliday ? 'holiday' : 'present';
         }
       });
 
@@ -121,6 +136,14 @@ export function AttendanceManagement() {
 
   const handleAttendanceChange = (studentId: string, status: string) => {
     setAttendance(prev => ({ ...prev, [studentId]: status }));
+  };
+
+  const handleSelectAll = (status: string) => {
+    const newAttendance = { ...attendance };
+    students.forEach(s => {
+      newAttendance[s.id] = status;
+    });
+    setAttendance(newAttendance);
   };
 
   const handleSave = async () => {
@@ -172,8 +195,8 @@ export function AttendanceManagement() {
             continue;
           }
 
-          if (!row.status || !['present', 'absent'].includes(row.status)) {
-            errors.push(`Row ${i + 2}: Invalid status (must be present or absent)`);
+          if (!row.status || !['present', 'absent', 'holiday'].includes(row.status)) {
+            errors.push(`Row ${i + 2}: Invalid status (must be present, absent, holiday)`);
             continue;
           }
 
@@ -235,6 +258,11 @@ export function AttendanceManagement() {
 
   const classSections = sections.filter(s => s.class_id === selectedClass);
 
+  const areAll = (status: string) => {
+    if (students.length === 0) return false;
+    return students.every(s => attendance[s.id] === status);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -269,6 +297,18 @@ export function AttendanceManagement() {
           )}
         </div>
       </div>
+
+      {holidayReason && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-center gap-3">
+          <div className="p-2 bg-amber-100 rounded-full">
+            <span className="text-xl">🎉</span>
+          </div>
+          <div>
+            <h3 className="font-bold text-amber-900">Holiday: {holidayReason}</h3>
+            <p className="text-sm text-amber-700">Attendance defaults to 'Holiday' but can be modified.</p>
+          </div>
+        </div>
+      )}
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -337,8 +377,39 @@ export function AttendanceManagement() {
                 <tr>
                   <th className="text-left px-6 py-4 text-sm font-semibold text-slate-900">Roll No.</th>
                   <th className="text-left px-6 py-4 text-sm font-semibold text-slate-900">Student Name</th>
-                  <th className="text-center px-6 py-4 text-sm font-semibold text-slate-900">Present</th>
-                  <th className="text-center px-6 py-4 text-sm font-semibold text-slate-900">Absent</th>
+                  <th className="text-center px-6 py-4 text-sm font-semibold text-slate-900">
+                    <div className="flex flex-col items-center gap-2">
+                      <span>Present</span>
+                      <input
+                        type="checkbox"
+                        checked={areAll('present')}
+                        onChange={() => handleSelectAll('present')}
+                        className="w-4 h-4 rounded text-green-600 focus:ring-green-500"
+                      />
+                    </div>
+                  </th>
+                  <th className="text-center px-6 py-4 text-sm font-semibold text-slate-900">
+                    <div className="flex flex-col items-center gap-2">
+                      <span>Absent</span>
+                      <input
+                        type="checkbox"
+                        checked={areAll('absent')}
+                        onChange={() => handleSelectAll('absent')}
+                        className="w-4 h-4 rounded text-red-600 focus:ring-red-500"
+                      />
+                    </div>
+                  </th>
+                  <th className="text-center px-6 py-4 text-sm font-semibold text-slate-900">
+                    <div className="flex flex-col items-center gap-2">
+                      <span>Holiday</span>
+                      <input
+                        type="checkbox"
+                        checked={areAll('holiday')}
+                        onChange={() => handleSelectAll('holiday')}
+                        className="w-4 h-4 rounded text-amber-500 focus:ring-amber-500"
+                      />
+                    </div>
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
@@ -355,7 +426,7 @@ export function AttendanceManagement() {
                         name={`attendance-${student.id}`}
                         checked={attendance[student.id] === 'present'}
                         onChange={() => handleAttendanceChange(student.id, 'present')}
-                        className="w-4 h-4 text-green-600"
+                        className="w-4 h-4 text-green-600 focus:ring-green-500"
                       />
                     </td>
                     <td className="px-6 py-4 text-center">
@@ -364,7 +435,16 @@ export function AttendanceManagement() {
                         name={`attendance-${student.id}`}
                         checked={attendance[student.id] === 'absent'}
                         onChange={() => handleAttendanceChange(student.id, 'absent')}
-                        className="w-4 h-4 text-red-600"
+                        className="w-4 h-4 text-red-600 focus:ring-red-500"
+                      />
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <input
+                        type="radio"
+                        name={`attendance-${student.id}`}
+                        checked={attendance[student.id] === 'holiday'}
+                        onChange={() => handleAttendanceChange(student.id, 'holiday')}
+                        className="w-4 h-4 text-amber-500 focus:ring-amber-500"
                       />
                     </td>
                   </tr>
@@ -396,7 +476,7 @@ export function AttendanceManagement() {
         />
         <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-4">
           <p className="text-sm text-amber-800">
-            <strong>Note:</strong> Status values: present, absent
+            <strong>Note:</strong> Status values: present, absent, holiday
           </p>
         </div>
       </Modal>

@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Mail, Phone, MapPin, CreditCard, User } from 'lucide-react';
+import { ArrowLeft, Mail, Phone, MapPin, CreditCard, User, Printer } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useSchool } from '../../hooks/useSchool';
 import { Student } from '../../types/database'; // Adjust path if needed
 import { formatDate, formatCurrency } from '../../lib/helpers'; // Assuming helpers exist, if not I'll define local
+import { ReceiptModal, StudentFeeData } from './modals/ReceiptModal';
 
 // Define types for the transaction history view since it's a join
 interface TransactionHistoryItem {
@@ -13,6 +14,7 @@ interface TransactionHistoryItem {
     transaction_ref: string | null;
     payment_date: string;
     remarks: string | null;
+    student_fee_id: string; // Needed for receipt
     installment?: {
         due_date: string;
         amount: number;
@@ -32,6 +34,11 @@ export function StudentProfile({ studentId, onBack }: StudentProfileProps) {
     const [student, setStudent] = useState<Student | null>(null);
     const [transactions, setTransactions] = useState<TransactionHistoryItem[]>([]);
     const [loading, setLoading] = useState(true);
+
+    // Receipt Modal State
+    const [showReceiptModal, setShowReceiptModal] = useState(false);
+    const [selectedStudentFee, setSelectedStudentFee] = useState<StudentFeeData | null>(null);
+    const [fetchingReceipt, setFetchingReceipt] = useState(false);
 
     useEffect(() => {
         if (studentId && schoolId) {
@@ -93,6 +100,7 @@ export function StudentProfile({ studentId, onBack }: StudentProfileProps) {
                     transaction_ref: tx.transaction_ref,
                     payment_date: tx.payment_date,
                     remarks: tx.remarks,
+                    student_fee_id: tx.student_fee_id,
                     installment: tx.installment ? {
                         due_date: tx.installment.due_date,
                         amount: tx.installment.amount,
@@ -111,6 +119,64 @@ export function StudentProfile({ studentId, onBack }: StudentProfileProps) {
             console.error('Error loading profile:', error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handlePrintReceipt = async (transaction: TransactionHistoryItem) => {
+        try {
+            setFetchingReceipt(true);
+
+            // We need to fetch the full StudentFeeData for the modal
+            // The modal expects specific fields that might not be in the simple 'student_fees' id fetch
+            // So we fetch the single fee record details
+            const { data: feeData, error } = await supabase
+                .from('student_fees')
+                .select(`
+                    *,
+                    student:students(
+                        id,
+                        name,
+                        admission_number,
+                        class_id,
+                        section_id,
+                        section:sections(id, name)
+                    ),
+                    class:classes(id, grade)
+                `)
+                .eq('id', transaction.student_fee_id)
+                .single();
+
+            if (error) throw error;
+
+            if (feeData) {
+                // Map to StudentFeeData interface
+                const feeDetails: StudentFeeData = {
+                    id: feeData.id,
+                    student_id: feeData.student?.id || feeData.student_id,
+                    student_name: feeData.student?.name || 'Unknown',
+                    admission_number: feeData.student?.admission_number || 'N/A',
+                    class_name: feeData.class?.grade || 'N/A',
+                    section_name: feeData.student?.section?.name || '',
+                    total_fee: parseFloat(feeData.total_fee),
+                    discount_amount: parseFloat(feeData.discount_amount || 0),
+                    net_fee: parseFloat(feeData.net_fee),
+                    paid_amount: parseFloat(feeData.paid_amount),
+                    pending_amount: parseFloat(feeData.pending_amount),
+                    status: feeData.status,
+                    class_id: feeData.class_id,
+                    section_id: feeData.student?.section_id,
+                    school_id: feeData.school_id
+                };
+
+                setSelectedStudentFee(feeDetails);
+                setShowReceiptModal(true);
+            }
+
+        } catch (error) {
+            console.error('Error fetching receipt details:', error);
+            alert('Could not load receipt details.');
+        } finally {
+            setFetchingReceipt(false);
         }
     };
 
@@ -241,6 +307,7 @@ export function StudentProfile({ studentId, onBack }: StudentProfileProps) {
                                             <th className="px-6 py-4 font-semibold text-slate-700">Fee Head</th>
                                             <th className="px-6 py-4 font-semibold text-slate-700">Mode</th>
                                             <th className="px-6 py-4 font-semibold text-slate-700 text-right">Amount</th>
+                                            <th className="px-6 py-4 font-semibold text-slate-700 text-center">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-200">
@@ -264,7 +331,17 @@ export function StudentProfile({ studentId, onBack }: StudentProfileProps) {
                                                     </span>
                                                 </td>
                                                 <td className="px-6 py-4 font-bold text-slate-900 text-right">
-                                                    {formatCurrency ? formatCurrency(tx.amount) : `₹${tx.amount}`}
+                                                    {formatCurrency(tx.amount)}
+                                                </td>
+                                                <td className="px-6 py-4 text-center">
+                                                    <button
+                                                        onClick={() => handlePrintReceipt(tx)}
+                                                        disabled={fetchingReceipt}
+                                                        className="p-2 hover:bg-slate-100 rounded-lg text-slate-600 transition-colors"
+                                                        title="Print Receipt"
+                                                    >
+                                                        <Printer className="w-4 h-4" />
+                                                    </button>
                                                 </td>
                                             </tr>
                                         ))}
@@ -280,6 +357,18 @@ export function StudentProfile({ studentId, onBack }: StudentProfileProps) {
                     </div>
                 </div>
             </div>
+
+            {selectedStudentFee && schoolId && (
+                <ReceiptModal
+                    isOpen={showReceiptModal}
+                    onClose={() => {
+                        setShowReceiptModal(false);
+                        setSelectedStudentFee(null);
+                    }}
+                    studentFee={selectedStudentFee}
+                    schoolId={schoolId}
+                />
+            )}
         </div>
     );
 }

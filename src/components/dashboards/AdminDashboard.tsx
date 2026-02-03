@@ -22,12 +22,9 @@ import { useSchool } from '../../hooks/useSchool';
 import { StudentManagement } from '../admin/StudentManagement';
 import { EducatorManagement } from '../admin/EducatorManagement';
 import { AttendanceManagement } from '../admin/AttendanceManagement';
-// import { ExamManagement } from '../admin/ExamManagement';
 import { ResultsManagement } from '../admin/results/ResultsManagement';
+import { ExamsModule } from '../admin/exams/ExamsModule';
 import { FeeManagement } from '../admin/FeeManagement';
-
-// ... (keep existing imports)
-
 import { AnnouncementManagement } from '../admin/AnnouncementManagement';
 import { Reports } from '../admin/Reports';
 import { Settings as SettingsPage } from '../admin/Settings';
@@ -35,9 +32,9 @@ import IDCardManagement from '../admin/IDCardManagement';
 import CertificateManagement from '../admin/CertificateManagement';
 import AdmissionsManagement from '../admin/AdmissionsManagement';
 import { SubjectManagement } from '../admin/SubjectManagement';
-import { StudentProfile } from '../admin/StudentProfile'; // Import StudentProfile
+import { StudentProfile } from '../admin/StudentProfile';
 
-type View = 'dashboard' | 'students' | 'educators' | 'attendance' | 'exams' | 'fees' | 'announcements' | 'reports' | 'settings' | 'idcards' | 'certificates' | 'admissions' | 'subjects';
+type View = 'dashboard' | 'students' | 'educators' | 'attendance' | 'exams' | 'results' | 'fees' | 'announcements' | 'reports' | 'settings' | 'idcards' | 'certificates' | 'admissions' | 'subjects';
 
 const STORAGE_KEY = 'admin_current_view';
 
@@ -97,7 +94,8 @@ export function AdminDashboard() {
     { name: 'Educators', icon: GraduationCap, active: currentView === 'educators', onClick: () => setCurrentView('educators') },
     { name: 'Admissions', icon: UserPlus, active: currentView === 'admissions', onClick: () => setCurrentView('admissions') },
     { name: 'Attendance', icon: UserCheck, active: currentView === 'attendance', onClick: () => setCurrentView('attendance') },
-    { name: 'Results & Exams', icon: BookOpen, active: currentView === 'exams', onClick: () => setCurrentView('exams') },
+    { name: 'Exams', icon: BookOpen, active: currentView === 'exams', onClick: () => setCurrentView('exams') },
+    { name: 'Results', icon: Award, active: currentView === 'results', onClick: () => setCurrentView('results') },
     { name: 'Fees', icon: DollarSign, active: currentView === 'fees', onClick: () => setCurrentView('fees') },
     { name: 'Subjects', icon: BookOpen, active: currentView === 'subjects', onClick: () => setCurrentView('subjects') },
     { name: 'ID Cards', icon: CreditCard, active: currentView === 'idcards', onClick: () => setCurrentView('idcards') },
@@ -120,8 +118,6 @@ export function AdminDashboard() {
   // Handler for student selection (from global search or list)
   const handleStudentSelect = (studentId: string) => {
     setSelectedStudentId(studentId);
-    // We don't necessarily change currentView, but we'll render profile ON TOP or simpler: 
-    // let's assume we render Profile if selectedStudentId is present.
   };
 
   const handleBackFromProfile = () => {
@@ -306,7 +302,8 @@ export function AdminDashboard() {
               {currentView === 'educators' && <EducatorManagement />}
               {currentView === 'admissions' && <AdmissionsManagement />}
               {currentView === 'attendance' && <AttendanceManagement />}
-              {currentView === 'exams' && <ResultsManagement />}
+              {currentView === 'exams' && <ExamsModule />}
+              {currentView === 'results' && <ResultsManagement />}
               {currentView === 'fees' && <FeeManagement onViewProfile={handleStudentSelect} />}
               {currentView === 'subjects' && <SubjectManagement />}
               {currentView === 'idcards' && <IDCardManagement />}
