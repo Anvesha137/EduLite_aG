@@ -1,7 +1,8 @@
-import { ReactNode } from 'react';
-import { LogOut, Menu, X } from 'lucide-react';
-import { useState } from 'react';
+import { ReactNode, useState, useEffect, useRef } from 'react';
+import { LogOut, Menu, X, Search } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
+import { Student } from '../types/database';
 
 interface LayoutProps {
   children: ReactNode;
@@ -12,11 +13,71 @@ interface LayoutProps {
     active?: boolean;
     onClick?: () => void;
   }>;
+  onStudentSearch?: (studentId: string) => void;
 }
 
-export function Layout({ children, title, navigation }: LayoutProps) {
+export function Layout({ children, title, navigation, onStudentSearch }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { role, clearRole } = useAuth();
+
+  // Global Search State
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState<Student[]>([]);
+  const [showResults, setShowResults] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const searchRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(event.target as Node)) {
+        setShowResults(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(() => {
+      if (searchTerm.length >= 2) {
+        performSearch();
+      } else {
+        setSearchResults([]);
+        setShowResults(false);
+      }
+    }, 300);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchTerm]);
+
+  const performSearch = async () => {
+    setSearching(true);
+    try {
+      const { data } = await supabase
+        .from('students')
+        .select('*')
+        .or(`name.ilike.%${searchTerm}%,admission_number.ilike.%${searchTerm}%`)
+        .limit(5);
+
+      if (data) {
+        setSearchResults(data as any); // Cast if needed
+        setShowResults(true);
+      }
+    } catch (error) {
+      console.error('Search error:', error);
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  const handleSearchResultClick = (studentId: string) => {
+    setSearchTerm('');
+    setShowResults(false);
+    if (onStudentSearch) {
+      onStudentSearch(studentId);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -53,8 +114,8 @@ export function Layout({ children, title, navigation }: LayoutProps) {
                 key={item.name}
                 onClick={item.onClick}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${item.active
-                    ? 'bg-blue-50 text-blue-700 font-medium'
-                    : 'text-slate-600 hover:bg-slate-50'
+                  ? 'bg-blue-50 text-blue-700 font-medium'
+                  : 'text-slate-600 hover:bg-slate-50'
                   }`}
               >
                 <Icon className="w-5 h-5" />
@@ -88,14 +149,53 @@ export function Layout({ children, title, navigation }: LayoutProps) {
 
       <div className="lg:pl-64">
         <header className="sticky top-0 z-10 h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-4 flex-1">
             <button
               onClick={() => setSidebarOpen(true)}
               className="lg:hidden p-2 hover:bg-slate-100 rounded-lg"
             >
               <Menu className="w-5 h-5" />
             </button>
-            <h1 className="text-xl font-bold text-slate-900">{title}</h1>
+            <h1 className="text-xl font-bold text-slate-900 hidden md:block">{title}</h1>
+
+            {/* Global Search Bar */}
+            <div className="max-w-md w-full relative ml-4" ref={searchRef}>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search student..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onFocus={() => searchTerm.length >= 2 && setShowResults(true)}
+                  className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all text-sm"
+                />
+                {searching && (
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                )}
+              </div>
+
+              {/* Search Results Dropdown */}
+              {showResults && searchResults.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-lg shadow-xl border border-slate-200 max-h-96 overflow-y-auto z-50">
+                  {searchResults.map((student) => (
+                    <button
+                      key={student.id}
+                      onClick={() => handleSearchResultClick(student.id)}
+                      className="w-full text-left px-4 py-3 hover:bg-slate-50 border-b border-slate-100 last:border-0 transition-colors flex items-center gap-3"
+                    >
+                      <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-xs">
+                        {student.name.charAt(0)}
+                      </div>
+                      <div>
+                        <p className="font-medium text-slate-900 text-sm">{student.name}</p>
+                        <p className="text-xs text-slate-500">Adm: {student.admission_number} • Class {student.class_id ? 'Linked' : '-'}</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </header>
 

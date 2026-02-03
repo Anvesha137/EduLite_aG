@@ -34,7 +34,11 @@ interface InstallmentData {
   status: string;
 }
 
-export function FeeManagement() {
+interface FeeManagementProps {
+  onViewProfile?: (studentId: string) => void;
+}
+
+export function FeeManagement({ onViewProfile }: FeeManagementProps) {
   const { schoolId, loading: schoolLoading } = useSchool();
   const [userId, setUserId] = useState<string>('');
 
@@ -329,8 +333,13 @@ export function FeeManagement() {
               {filteredStudentFees.map((fee) => (
                 <tr key={fee.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-6 py-4">
-                    <p className="font-medium text-slate-900">{fee.student_name}</p>
-                    <p className="text-sm text-slate-600">{fee.admission_number}</p>
+                    <button
+                      onClick={() => onViewProfile && onViewProfile(fee.student_id)}
+                      className="text-left hover:text-blue-600 transition-colors"
+                    >
+                      <p className="font-medium text-slate-900">{fee.student_name}</p>
+                      <p className="text-sm text-slate-600">{fee.admission_number}</p>
+                    </button>
                   </td>
                   <td className="px-6 py-4 text-sm text-slate-900">{fee.class_name}</td>
                   <td className="px-6 py-4 text-sm text-slate-900">{fee.section_name}</td>

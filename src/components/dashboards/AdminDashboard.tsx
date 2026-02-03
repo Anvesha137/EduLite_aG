@@ -35,6 +35,7 @@ import IDCardManagement from '../admin/IDCardManagement';
 import CertificateManagement from '../admin/CertificateManagement';
 import AdmissionsManagement from '../admin/AdmissionsManagement';
 import { SubjectManagement } from '../admin/SubjectManagement';
+import { StudentProfile } from '../admin/StudentProfile'; // Import StudentProfile
 
 type View = 'dashboard' | 'students' | 'educators' | 'attendance' | 'exams' | 'fees' | 'announcements' | 'reports' | 'settings' | 'idcards' | 'certificates' | 'admissions' | 'subjects';
 
@@ -47,6 +48,9 @@ export function AdminDashboard() {
     const saved = localStorage.getItem(STORAGE_KEY);
     return (saved as View) || 'dashboard';
   });
+  // New state for student profile
+  const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+
   const [students, setStudents] = useState<Student[]>([]);
   const [educators, setEducators] = useState<Educator[]>([]);
   const [classes, setClasses] = useState<Class[]>([]);
@@ -112,6 +116,18 @@ export function AdminDashboard() {
       setCurrentView('admissions');
     }
   }, [role, currentView]);
+
+  // Handler for student selection (from global search or list)
+  const handleStudentSelect = (studentId: string) => {
+    setSelectedStudentId(studentId);
+    // We don't necessarily change currentView, but we'll render profile ON TOP or simpler: 
+    // let's assume we render Profile if selectedStudentId is present.
+  };
+
+  const handleBackFromProfile = () => {
+    setSelectedStudentId(null);
+  };
+
 
   const attendanceRate = students.length > 0
     ? Math.round((todayAttendance.filter(a => a.status === 'present').length / students.length) * 100)
@@ -263,26 +279,43 @@ export function AdminDashboard() {
   );
 
   return (
-    <Layout title="School Administration" navigation={navigation}>
+    <Layout
+      title="School Administration"
+      navigation={navigation}
+      onStudentSearch={handleStudentSelect}
+    >
       {loading ? (
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
         </div>
       ) : (
         <>
-          {currentView === 'dashboard' && renderDashboard()}
-          {currentView === 'students' && <StudentManagement />}
-          {currentView === 'educators' && <EducatorManagement />}
-          {currentView === 'admissions' && <AdmissionsManagement />}
-          {currentView === 'attendance' && <AttendanceManagement />}
-          {currentView === 'exams' && <ResultsManagement />}
-          {currentView === 'fees' && <FeeManagement />}
-          {currentView === 'subjects' && <SubjectManagement />}
-          {currentView === 'idcards' && <IDCardManagement />}
-          {currentView === 'certificates' && <CertificateManagement />}
-          {currentView === 'announcements' && <AnnouncementManagement />}
-          {currentView === 'reports' && <Reports />}
-          {currentView === 'settings' && <SettingsPage />}
+          {selectedStudentId ? (
+            <StudentProfile
+              studentId={selectedStudentId}
+              onBack={handleBackFromProfile}
+            />
+          ) : (
+            <>
+              {currentView === 'dashboard' && renderDashboard()}
+              {currentView === 'students' && (
+                <StudentManagement
+                  onViewProfile={handleStudentSelect}
+                />
+              )}
+              {currentView === 'educators' && <EducatorManagement />}
+              {currentView === 'admissions' && <AdmissionsManagement />}
+              {currentView === 'attendance' && <AttendanceManagement />}
+              {currentView === 'exams' && <ResultsManagement />}
+              {currentView === 'fees' && <FeeManagement onViewProfile={handleStudentSelect} />}
+              {currentView === 'subjects' && <SubjectManagement />}
+              {currentView === 'idcards' && <IDCardManagement />}
+              {currentView === 'certificates' && <CertificateManagement />}
+              {currentView === 'announcements' && <AnnouncementManagement />}
+              {currentView === 'reports' && <Reports />}
+              {currentView === 'settings' && <SettingsPage />}
+            </>
+          )}
         </>
       )}
     </Layout>

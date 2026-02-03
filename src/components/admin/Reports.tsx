@@ -60,7 +60,16 @@ export function Reports() {
       .lte('date', endDate)
       .order('date', { ascending: false });
 
-    setReportData(attendanceData || []);
+    const processedData = attendanceData?.map((a: any) => ({
+      student_name: a.students?.name || 'Unknown',
+      admission_number: a.students?.admission_number || 'N/A',
+      class: a.students?.class?.grade || 'N/A',
+      date: a.date,
+      status: a.status,
+      remarks: a.remarks || '-'
+    })) || [];
+
+    setReportData(processedData);
 
     const totalRecords = attendanceData?.length || 0;
     const presentCount = attendanceData?.filter(a => a.status === 'present').length || 0;
@@ -86,7 +95,7 @@ export function Reports() {
         section:sections(name)
       `)
       .eq('school_id', schoolId)
-      .eq('status', 'paid')
+      .gt('paid_amount', 0) // Show all records with any payment
       .order('updated_at', { ascending: false });
 
     if (feesError) {
@@ -187,7 +196,17 @@ export function Reports() {
       .eq('school_id', schoolId)
       .order('name');
 
-    setReportData(studentsData || []);
+    const processedData = studentsData?.map((s: any) => ({
+      name: s.name,
+      admission_number: s.admission_number,
+      class: s.classes?.grade || 'N/A',
+      section: s.sections?.name || 'N/A',
+      parent_name: s.parent?.name || 'N/A',
+      status: s.status,
+      admission_date: s.admission_date
+    })) || [];
+
+    setReportData(processedData);
 
     const totalStudents = studentsData?.length || 0;
     const activeStudents = studentsData?.filter(s => s.status === 'active').length || 0;

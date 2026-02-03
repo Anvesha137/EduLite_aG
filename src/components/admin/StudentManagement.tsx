@@ -2,12 +2,16 @@ import { useState, useEffect } from 'react';
 import { Plus, Search, Upload, Edit, Trash2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useSchool } from '../../hooks/useSchool';
-import { Student, Class, Section, Parent } from '../../types/database';
+import { Student, Class, Section } from '../../types/database';
 import { Modal } from '../Modal';
 import { CSVUpload } from '../CSVUpload';
 import { formatDate } from '../../lib/helpers';
 
-export function StudentManagement() {
+interface StudentManagementProps {
+  onViewProfile?: (studentId: string) => void;
+}
+
+export function StudentManagement({ onViewProfile }: StudentManagementProps) {
   const { schoolId, loading: schoolLoading } = useSchool();
   const [students, setStudents] = useState<Student[]>([]);
   const [classes, setClasses] = useState<Class[]>([]);
@@ -54,7 +58,7 @@ export function StudentManagement() {
     return matchesSearch && matchesClass && matchesStatus;
   });
 
-  const handleBulkUpload = async (data: any[]) => {
+  const handleBulkUpload = async (_data: any[]) => {
     // Bulk Helper - Needs updating if parents are new, but for now assuming this works with existing data structures
     // or standard insert since we simplified single-add.
     // For now, let's keep bulk simple (requires matching IDs usually).
@@ -156,8 +160,13 @@ export function StudentManagement() {
                 <tr key={student.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-6 py-4 text-sm text-slate-900">{student.admission_number}</td>
                   <td className="px-6 py-4">
-                    <p className="font-medium text-slate-900">{student.name}</p>
-                    <p className="text-sm text-slate-600">{student.gender}</p>
+                    <button
+                      onClick={() => onViewProfile && onViewProfile(student.id)}
+                      className="text-left hover:text-blue-600 transition-colors"
+                    >
+                      <p className="font-medium text-slate-900">{student.name}</p>
+                      <p className="text-sm text-slate-600">{student.gender}</p>
+                    </button>
                   </td>
                   <td className="px-6 py-4 text-sm text-slate-900">
                     {(student as any).class?.grade || '-'} {(student as any).section?.name || ''}
