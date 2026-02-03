@@ -15,6 +15,7 @@ import {
   CreditCard,
   Award,
   UserPlus,
+  Layers,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { Student, Educator, Attendance, Class } from '../../types/database';
@@ -33,8 +34,10 @@ import CertificateManagement from '../admin/CertificateManagement';
 import AdmissionsManagement from '../admin/AdmissionsManagement';
 import { SubjectManagement } from '../admin/SubjectManagement';
 import { StudentProfile } from '../admin/StudentProfile';
+import { SchoolPlanModule } from '../admin/school-plan/SchoolPlanModule';
+import { ExpenseManagement } from '../admin/ExpenseManagement';
 
-type View = 'dashboard' | 'students' | 'educators' | 'attendance' | 'exams' | 'results' | 'fees' | 'announcements' | 'reports' | 'settings' | 'idcards' | 'certificates' | 'admissions' | 'subjects';
+type View = 'dashboard' | 'students' | 'educators' | 'attendance' | 'exams' | 'results' | 'fees' | 'expenses' | 'announcements' | 'reports' | 'settings' | 'idcards' | 'certificates' | 'admissions' | 'subjects' | 'schoolplan';
 
 const STORAGE_KEY = 'admin_current_view';
 
@@ -90,9 +93,11 @@ export function AdminDashboard() {
 
   const allNavigation = [
     { name: 'Dashboard', icon: LayoutDashboard, active: currentView === 'dashboard', onClick: () => setCurrentView('dashboard') },
+    { name: 'School Plan', icon: Layers, active: currentView === 'schoolplan', onClick: () => setCurrentView('schoolplan') },
     { name: 'Students', icon: Users, active: currentView === 'students', onClick: () => setCurrentView('students') },
     { name: 'Educators', icon: GraduationCap, active: currentView === 'educators', onClick: () => setCurrentView('educators') },
     { name: 'Admissions', icon: UserPlus, active: currentView === 'admissions', onClick: () => setCurrentView('admissions') },
+    { name: 'Expenses', icon: DollarSign, active: currentView === 'expenses', onClick: () => setCurrentView('expenses') },
     { name: 'Attendance', icon: UserCheck, active: currentView === 'attendance', onClick: () => setCurrentView('attendance') },
     { name: 'Exams', icon: BookOpen, active: currentView === 'exams', onClick: () => setCurrentView('exams') },
     { name: 'Results', icon: Award, active: currentView === 'results', onClick: () => setCurrentView('results') },
@@ -305,7 +310,9 @@ export function AdminDashboard() {
               {currentView === 'exams' && <ExamsModule />}
               {currentView === 'results' && <ResultsManagement />}
               {currentView === 'fees' && <FeeManagement onViewProfile={handleStudentSelect} />}
+              {currentView === 'expenses' && <ExpenseManagement />}
               {currentView === 'subjects' && <SubjectManagement />}
+              {currentView === 'schoolplan' && <SchoolPlanModule />}
               {currentView === 'idcards' && <IDCardManagement />}
               {currentView === 'certificates' && <CertificateManagement />}
               {currentView === 'announcements' && <AnnouncementManagement />}
