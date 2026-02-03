@@ -37,19 +37,36 @@ interface ReceiptModalProps {
     isOpen: boolean;
     onClose: () => void;
     studentFee: StudentFeeData;
-    schoolId: string;
+    initialTransaction?: any;
 }
 
-export function ReceiptModal({ isOpen, onClose, studentFee, schoolId }: ReceiptModalProps) {
+export function ReceiptModal({ isOpen, onClose, studentFee, initialTransaction }: ReceiptModalProps) {
     const [installments, setInstallments] = useState<InstallmentData[]>([]);
     const [transactions, setTransactions] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
 
+    // New state for single receipt printing
+    const [selectedTransaction, setSelectedTransaction] = useState<any | null>(null);
+    const [view, setView] = useState<'summary' | 'receipt'>('summary');
+
     useEffect(() => {
-        if (isOpen && studentFee) {
-            fetchData();
+        if (isOpen) {
+            if (studentFee) {
+                fetchData();
+            }
+            if (initialTransaction) {
+                setSelectedTransaction(initialTransaction);
+                setView('receipt');
+            } else {
+                setView('summary');
+                setSelectedTransaction(null);
+            }
+        } else {
+            // Reset view when closed
+            setView('summary');
+            setSelectedTransaction(null);
         }
-    }, [isOpen, studentFee]);
+    }, [isOpen, studentFee, initialTransaction]);
 
     const fetchData = async () => {
         try {
@@ -101,13 +118,94 @@ export function ReceiptModal({ isOpen, onClose, studentFee, schoolId }: ReceiptM
         }
     };
 
+    const handlePrintSingle = (transaction: any) => {
+        setSelectedTransaction(transaction);
+        setView('receipt');
+    };
+
+    // View: Single Receipt
+    if (view === 'receipt' && selectedTransaction) {
+        return (
+            <Modal isOpen={isOpen} onClose={onClose} title={`Payment Receipt - ${selectedTransaction.transaction_ref || 'N/A'}`} size="lg">
+                <div className="space-y-6">
+                    <div className="border-b border-slate-200 pb-4">
+                        <div className="flex justify-between items-start">
+                            <div>
+                                <h3 className="font-bold text-lg text-slate-900">Payment Receipt</h3>
+                                <p className="text-sm text-slate-500">Date: {new Date(selectedTransaction.payment_date).toLocaleDateString('en-IN')}</p>
+                                <p className="text-sm text-slate-500">Receipt No: {selectedTransaction.transaction_ref || 'PENDING'}</p>
+                            </div>
+                            <div className="text-right">
+                                <p className="font-bold text-slate-900">{studentFee.student_name}</p>
+                                <p className="text-sm text-slate-500">ADM: {studentFee.admission_number}</p>
+                                <p className="text-sm text-slate-500">Class: {studentFee.class_name} - {studentFee.section_name}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-slate-50 p-6 rounded-lg border border-slate-200 text-center">
+                        <p className="text-slate-500 mb-1">Amount Paid</p>
+                        <p className="text-3xl font-bold text-slate-900">{formatCurrency(selectedTransaction.amount)}</p>
+                        <div className="mt-4 flex justify-center gap-4 text-sm">
+                            <span className="px-3 py-1 bg-white rounded border border-slate-200 text-slate-600 capitalize">
+                                Mode: {selectedTransaction.payment_mode}
+                            </span>
+                            <span className="px-3 py-1 bg-white rounded border border-slate-200 text-slate-600">
+                                For: {selectedTransaction.installment?.installment_name || 'General Fee'}
+                            </span>
+                        </div>
+                    </div>
+
+                    {/* Footer / Auth Signature Area */}
+                    <div className="pt-12 mt-8 border-t border-slate-200 flex justify-between items-end text-sm text-slate-500">
+                        <div>
+                            <p>Generated on {new Date().toLocaleDateString('en-IN')}</p>
+                        </div>
+                        <div className="text-right">
+                            <div className="h-12 w-32 border-b border-slate-300 mb-2"></div>
+                            <p>Authorized Signature</p>
+                        </div>
+                    </div>
+
+                    <div className="flex justify-between gap-3 pt-4 no-print">
+                        <button
+                            onClick={() => {
+                                setView('summary');
+                                setSelectedTransaction(null);
+                            }}
+                            className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                        >
+                            Back to Summary
+                        </button>
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => window.print()}
+                                className="px-4 py-2 bg-slate-800 text-white rounded-lg flex items-center gap-2 hover:bg-slate-900"
+                            >
+                                <Printer className="w-4 h-4" />
+                                Print Receipt
+                            </button>
+                            <button
+                                onClick={onClose}
+                                className="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                            >
+                                Close
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </Modal>
+        );
+    }
+
+    // View: Summary (Default)
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title={`Fee Receipt - ${studentFee.student_name}`} size="lg">
+        <Modal isOpen={isOpen} onClose={onClose} title={`Fee Statement - ${studentFee.student_name}`} size="lg">
             <div className="space-y-6">
                 <div className="border-b border-slate-200 pb-4">
                     <div className="flex justify-between items-start">
                         <div>
-                            <h3 className="font-bold text-lg text-slate-900">Fee Receipt</h3>
+                            <h3 className="font-bold text-lg text-slate-900">Fee Statement</h3>
                             <p className="text-sm text-slate-500">Date: {new Date().toLocaleDateString('en-IN')}</p>
                             <p className="text-sm text-slate-500">Academic Year: 2024-25</p>
                         </div>
@@ -202,6 +300,7 @@ export function ReceiptModal({ isOpen, onClose, studentFee, schoolId }: ReceiptM
                                         <th className="px-4 py-2 text-right text-xs font-medium text-slate-500 uppercase">Paid Amount</th>
                                         <th className="px-4 py-2 text-center text-xs font-medium text-slate-500 uppercase">Mode</th>
                                         <th className="px-4 py-2 text-left text-xs font-medium text-slate-500 uppercase">Receipt No</th>
+                                        <th className="px-4 py-2 text-center text-xs font-medium text-slate-500 uppercase">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-slate-200">
@@ -214,11 +313,20 @@ export function ReceiptModal({ isOpen, onClose, studentFee, schoolId }: ReceiptM
                                             <td className="px-4 py-2 text-sm text-right font-bold text-slate-900">{formatCurrency(trans.amount)}</td>
                                             <td className="px-4 py-2 text-sm text-center capitalize">{trans.payment_mode}</td>
                                             <td className="px-4 py-2 text-sm text-slate-600">{trans.transaction_ref || '-'}</td>
+                                            <td className="px-4 py-2 text-sm text-center">
+                                                <button
+                                                    onClick={() => handlePrintSingle(trans)}
+                                                    className="p-1.5 hover:bg-slate-100 rounded text-slate-600 transition-colors"
+                                                    title="Print Receipt"
+                                                >
+                                                    <Printer className="w-4 h-4" />
+                                                </button>
+                                            </td>
                                         </tr>
                                     ))}
                                     {transactions.length === 0 && (
                                         <tr>
-                                            <td colSpan={5} className="px-4 py-4 text-center text-sm text-slate-500">No transactions found</td>
+                                            <td colSpan={6} className="px-4 py-4 text-center text-sm text-slate-500">No transactions found</td>
                                         </tr>
                                     )}
                                 </tbody>
@@ -233,7 +341,7 @@ export function ReceiptModal({ isOpen, onClose, studentFee, schoolId }: ReceiptM
                         className="px-4 py-2 bg-slate-800 text-white rounded-lg flex items-center gap-2 hover:bg-slate-900"
                     >
                         <Printer className="w-4 h-4" />
-                        Print
+                        Print Statement
                     </button>
                     <button
                         onClick={onClose}

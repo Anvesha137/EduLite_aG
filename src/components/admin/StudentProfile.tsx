@@ -41,7 +41,7 @@ export function StudentProfile({ studentId, onBack }: StudentProfileProps) {
     // Receipt Modal State
     const [showReceiptModal, setShowReceiptModal] = useState(false);
     const [selectedStudentFee, setSelectedStudentFee] = useState<StudentFeeData | null>(null);
-    const [fetchingReceipt, setFetchingReceipt] = useState(false);
+    const [selectedReceiptTx, setSelectedReceiptTx] = useState<TransactionHistoryItem | null>(null);
 
     // Fee Actions State
     const [userId, setUserId] = useState<string>('');
@@ -142,7 +142,7 @@ export function StudentProfile({ studentId, onBack }: StudentProfileProps) {
 
                 // Map the data - Manual Join
                 const formattedTransactions = (transData || []).map((tx: any) => {
-                    const linkedInst = installments.find((inst: any) => inst.id === tx.installment_id);
+                    const linkedInst = instData ? instData.find((inst: any) => inst.id === tx.installment_id) : undefined;
 
                     return {
                         id: tx.id,
@@ -175,63 +175,14 @@ export function StudentProfile({ studentId, onBack }: StudentProfileProps) {
         }
     };
 
-    const handlePrintReceipt = async (transaction: TransactionHistoryItem) => {
-        try {
-            setFetchingReceipt(true);
-
-            // We need to fetch the full StudentFeeData for the modal
-            // The modal expects specific fields that might not be in the simple 'student_fees' id fetch
-            // So we fetch the single fee record details
-            const { data: feeData, error } = await supabase
-                .from('student_fees')
-                .select(`
-                    *,
-                    student:students(
-                        id,
-                        name,
-                        admission_number,
-                        class_id,
-                        section_id,
-                        section:sections(id, name)
-                    ),
-                    class:classes(id, grade)
-                `)
-                .eq('id', transaction.student_fee_id)
-                .single();
-
-            if (error) throw error;
-
-            if (feeData) {
-                // Map to StudentFeeData interface
-                const feeDetails: StudentFeeData = {
-                    id: feeData.id,
-                    student_id: feeData.student?.id || feeData.student_id,
-                    student_name: feeData.student?.name || 'Unknown',
-                    admission_number: feeData.student?.admission_number || 'N/A',
-                    class_name: feeData.class?.grade || 'N/A',
-                    section_name: feeData.student?.section?.name || '',
-                    total_fee: parseFloat(feeData.total_fee),
-                    discount_amount: parseFloat(feeData.discount_amount || 0),
-                    net_fee: parseFloat(feeData.net_fee),
-                    paid_amount: parseFloat(feeData.paid_amount),
-                    pending_amount: parseFloat(feeData.pending_amount),
-                    status: feeData.status,
-                    class_id: feeData.class_id,
-                    section_id: feeData.student?.section_id,
-                    school_id: feeData.school_id
-                };
-
-                setSelectedStudentFee(feeDetails);
-                setShowReceiptModal(true);
-            }
-
-        } catch (error) {
-            console.error('Error fetching receipt details:', error);
-            alert('Could not load receipt details.');
-        } finally {
-            setFetchingReceipt(false);
+    const handlePrintReceipt = (transaction: TransactionHistoryItem) => {
+        if (feeRecord) {
+            setSelectedStudentFee(feeRecord);
+            setSelectedReceiptTx(transaction);
+            setShowReceiptModal(true);
         }
     };
+
 
     if (loading) {
         return <div className="flex items-center justify-center h-64">
@@ -264,6 +215,17 @@ export function StudentProfile({ studentId, onBack }: StudentProfileProps) {
 
                 {feeRecord && (
                     <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => {
+                                setSelectedStudentFee(feeRecord);
+                                setSelectedReceiptTx(null);
+                                setShowReceiptModal(true);
+                            }}
+                            className="flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
+                        >
+                            <Printer className="w-4 h-4" />
+                            Print Statement
+                        </button>
                         {feeRecord.status !== 'paid' && (
                             <button
                                 onClick={() => {
@@ -475,7 +437,6 @@ export function StudentProfile({ studentId, onBack }: StudentProfileProps) {
                                                 <td className="px-6 py-4 text-center">
                                                     <button
                                                         onClick={() => handlePrintReceipt(tx)}
-                                                        disabled={fetchingReceipt}
                                                         className="p-2 hover:bg-slate-100 rounded-lg text-slate-600 transition-colors"
                                                         title="Print Receipt"
                                                     >
@@ -504,9 +465,10 @@ export function StudentProfile({ studentId, onBack }: StudentProfileProps) {
                         onClose={() => {
                             setShowReceiptModal(false);
                             setSelectedStudentFee(null);
+                            setSelectedReceiptTx(null);
                         }}
                         studentFee={selectedStudentFee}
-                        schoolId={schoolId}
+                        initialTransaction={selectedReceiptTx}
                     />
                     <PaymentModal
                         isOpen={showPaymentModal}

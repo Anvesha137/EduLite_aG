@@ -427,7 +427,6 @@ export function FeeManagement({ onViewProfile }: FeeManagementProps) {
               setSelectedStudentFee(null);
             }}
             studentFee={selectedStudentFee}
-            schoolId={schoolId!}
           />
         </>
       )}
