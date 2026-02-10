@@ -100,7 +100,7 @@ export function AssessmentConfigTab() {
             setCurrentScale(null);
         } catch (error) {
             console.error('Error saving scale:', error);
-            alert('Failed to save grade scale.');
+            alert('Failed to save grade scale: ' + (error as any).message);
         }
     };
 
