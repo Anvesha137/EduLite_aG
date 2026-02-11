@@ -11,7 +11,7 @@ interface Student {
   id: string;
   name: string;
   admission_number: string;
-  class: { grade: string };
+  class: { name: string };
   section: { name: string };
   photo_url?: string;
 }
@@ -58,6 +58,8 @@ export default function IDCardManagement() {
   const [showPreview, setShowPreview] = useState(false);
   const [previewEntity, setPreviewEntity] = useState<Student | Educator | null>(null);
   const [processingCount, setProcessingCount] = useState(0);
+  const [uploadingId, setUploadingId] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // History Tab State
   const [generations, setGenerations] = useState<any[]>([]);
@@ -174,7 +176,7 @@ export default function IDCardManagement() {
         name,
         admission_number,
         photo_url,
-        class:classes(grade),
+        class:classes(name),
         section:sections(name)
       `)
       .eq('school_id', schoolId)
@@ -435,6 +437,86 @@ export default function IDCardManagement() {
     }
   };
 
+  const handleImageUploadTrigger = (entityId: string) => {
+    setUploadingId(entityId);
+    if (fileInputRef.current) {
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !uploadingId) return;
+
+    // Validate
+    if (!file.type.startsWith('image/')) {
+      setMessage({ type: 'error', text: 'Please upload an image file (JPG, PNG)' });
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) { // 2MB limit
+      setMessage({ type: 'error', text: 'Image size should be less than 2MB' });
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${uploadingId}-${Date.now()}.${fileExt}`;
+      // Note: You must create these buckets in Supabase Storage or use a public 'photos' bucket.
+      // Assuming 'photos' generic bucket for now if specific ones don't exist, or specific ones.
+      // Let's try a generic 'photos' bucket with folder structure.
+      const filePath = `${cardType}s/${fileName}`;
+
+      // 1. Upload
+      const { error: uploadError } = await supabase.storage
+        .from('Photos') // UPDATED: Matches user's created bucket 'Photos'
+        .upload(filePath, file);
+
+      if (uploadError) {
+        // Create bucket if not exists? No, client cannot create buckets usually.
+        // Fallback to error message
+        throw uploadError;
+      }
+
+      // 2. Get Public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('Photos')
+        .getPublicUrl(filePath);
+
+      // 3. Update Database
+      const table = cardType === 'student' ? 'students' : 'educators';
+      const { error: dbError } = await supabase
+        .from(table)
+        .update({ photo_url: publicUrl })
+        .eq('id', uploadingId);
+
+      if (dbError) throw dbError;
+
+      setMessage({ type: 'success', text: 'Photo uploaded successfully' });
+
+      // 4. Refresh List
+      if (cardType === 'student') {
+        loadStudents();
+      } else {
+        loadEducators();
+      }
+
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      // DEBUG: List buckets to see what exists
+      supabase.storage.listBuckets().then(({ data, error }) => {
+        console.log('Available buckets:', data);
+        if (error) console.error('Error listing buckets:', error);
+      });
+      setMessage({ type: 'error', text: 'Upload failed: ' + error.message });
+    } finally {
+      setLoading(false);
+      setUploadingId(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
   // Helper to render the specific card layout
   const renderCardLayout = (layout: string, entity: any, scale: number = 1) => {
     const style = { transform: `scale(${scale})`, transformOrigin: 'top left' };
@@ -600,6 +682,15 @@ export default function IDCardManagement() {
         </div>
       )}
 
+      {/* Hidden File Input */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleImageUpload}
+        accept="image/*"
+        className="hidden"
+      />
+
       <div className="border-b border-slate-200">
         <div className="flex gap-4">
           {[
@@ -744,6 +835,13 @@ export default function IDCardManagement() {
                           </div>
                           <div>
                             <p className="font-medium text-slate-900">{entity.name}</p>
+                            <button
+                              onClick={() => handleImageUploadTrigger(entity.id)}
+                              className="text-xs text-blue-600 hover:text-blue-800 underline mt-0.5 flex items-center gap-1"
+                            >
+                              <User className="w-3 h-3" />
+                              {entity.photo_url ? 'Change Photo' : 'Upload Photo'}
+                            </button>
                           </div>
                         </div>
                       </td>

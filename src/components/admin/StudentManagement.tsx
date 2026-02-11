@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Search, Upload, Edit, Trash2 } from 'lucide-react';
+import { Plus, Search, Upload, Edit, Trash2, User } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useSchool } from '../../hooks/useSchool';
 import { Student, Class, Section } from '../../types/database';
@@ -160,13 +160,26 @@ export function StudentManagement({ onViewProfile }: StudentManagementProps) {
                 <tr key={student.id} className="hover:bg-slate-50 transition-colors">
                   <td className="px-6 py-4 text-sm text-slate-900">{student.admission_number}</td>
                   <td className="px-6 py-4">
-                    <button
-                      onClick={() => onViewProfile && onViewProfile(student.id)}
-                      className="text-left hover:text-blue-600 transition-colors"
-                    >
-                      <p className="font-medium text-slate-900">{student.name}</p>
-                      <p className="text-sm text-slate-600">{student.gender}</p>
-                    </button>
+                    <div className="flex items-center gap-3">
+                      {student.photo_url ? (
+                        <img
+                          src={student.photo_url}
+                          alt={student.name}
+                          className="w-10 h-10 rounded-full object-cover border border-slate-200"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center border border-slate-200 text-slate-400">
+                          <User className="w-5 h-5" />
+                        </div>
+                      )}
+                      <button
+                        onClick={() => onViewProfile && onViewProfile(student.id)}
+                        className="text-left hover:text-blue-600 transition-colors"
+                      >
+                        <p className="font-medium text-slate-900">{student.name}</p>
+                        <p className="text-sm text-slate-600">{student.gender}</p>
+                      </button>
+                    </div>
                   </td>
                   <td className="px-6 py-4 text-sm text-slate-900">
                     {(student as any).class?.name || '-'} {(student as any).section?.name || ''}

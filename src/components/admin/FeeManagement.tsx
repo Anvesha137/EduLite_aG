@@ -147,9 +147,9 @@ export function FeeManagement({ onViewProfile }: FeeManagementProps) {
       // Ensure we have some classes for filter if empty
       if (classes.length === 0) {
         setClasses([
-          { id: 'mock-c-1', grade: '10' },
-          { id: 'mock-c-2', grade: '11' },
-          { id: 'mock-c-3', grade: '9' }
+          { id: 'mock-c-1', name: '10' },
+          { id: 'mock-c-2', name: '11' },
+          { id: 'mock-c-3', name: '9' }
         ]);
       }
     } catch (error: any) {
