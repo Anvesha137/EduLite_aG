@@ -64,7 +64,7 @@ export default function AdmissionsManagement() {
   const { role } = useAuth();
   const [userId, setUserId] = useState<string>('');
   const isAdmin = ['SUPERADMIN', 'ADMIN'].includes(role || '');
-  const [counselorOptions, setCounselorOptions] = useState<any[]>([]);
+  // const [counselorOptions, setCounselorOptions] = useState<any[]>([]); // Removed dead code
 
   useEffect(() => {
     const getUser = async () => {
@@ -79,7 +79,7 @@ export default function AdmissionsManagement() {
   const [activeTab, setActiveTab] = useState<'leads' | 'applications' | 'analytics' | 'counsellors'>('applications');
   const [leads, setLeads] = useState<Lead[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
-  const [counsellors, setCounsellors] = useState<any[]>([]);
+  // const [counsellors, setCounsellors] = useState<any[]>([]); // Removed dead code
   const [classes, setClasses] = useState<Class[]>([]);
   const [funnelStages, setFunnelStages] = useState<FunnelStage[]>([]);
   const [leadSources, setLeadSources] = useState<LeadSource[]>([]);
@@ -146,14 +146,13 @@ export default function AdmissionsManagement() {
       loadFunnelStages();
       loadLeadSources();
       loadClasses();
-      loadCounselorOptions();
     } else if (!schoolLoading && !schoolId) {
       // setLoading(false); // Removed
     }
   }, [schoolId, schoolLoading]);
 
   const loadLeadSources = async () => {
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('admission_lead_sources')
       .select('*')
       .eq('school_id', schoolId)
@@ -173,23 +172,13 @@ export default function AdmissionsManagement() {
     }
   };
 
-  const loadCounselorOptions = async () => {
-    try {
-      const { data, error } = await supabase.rpc('get_available_counsellors', { p_school_id: schoolId });
-      if (error) throw error;
-      if (data) setCounselorOptions(data);
-    } catch (err) {
-      console.error('Error loading counselor options:', err);
-    }
-  };
+  // loadCounselorOptions removed
 
   useEffect(() => {
     if (activeTab === 'leads') {
       loadLeads();
     } else if (activeTab === 'applications') {
       loadApplications();
-    } else if (activeTab === 'counsellors') {
-      loadCounsellors();
     }
   }, [activeTab, filterStage, filterStatus, filterSource]);
 
@@ -197,7 +186,7 @@ export default function AdmissionsManagement() {
   const loadData = async () => {
     // setLoading(true); // Removed
     try {
-      await Promise.all([loadLeads(), loadApplications(), loadCounsellors()]);
+      await Promise.all([loadLeads(), loadApplications()]);
     } finally {
       // setLoading(false); // Removed
     }
@@ -225,15 +214,7 @@ export default function AdmissionsManagement() {
     if (data) setClasses(data);
   };
 
-  const loadCounsellors = async () => {
-    try {
-      const { data, error } = await supabase.rpc('get_admission_counsellors_analytics', { p_school_id: schoolId });
-      if (error) throw error;
-      if (data) setCounsellors(data);
-    } catch (err) {
-      console.error('Error loading counsellors:', err);
-    }
-  };
+  // loadCounsellors removed
 
   const loadLeads = async () => {
     try {
@@ -348,7 +329,7 @@ export default function AdmissionsManagement() {
     setSaving(true);
 
     try {
-      const { data, error } = await supabase.rpc('create_admission_lead', {
+      const { error } = await supabase.rpc('create_admission_lead', {
         p_school_id: schoolId,
         p_parent_name: leadForm.parent_name,
         p_contact_number: leadForm.contact_number,
@@ -1096,7 +1077,7 @@ export default function AdmissionsManagement() {
                           name="referralType"
                           value="staff"
                           checked={leadForm.referral_type === 'staff'}
-                          onChange={(e) => setLeadForm({ ...leadForm, referral_type: 'staff' as any, referral_code: '', })}
+                          onChange={() => setLeadForm({ ...leadForm, referral_type: 'staff' as any, referral_code: '', })}
                         />
                         <span className="text-sm">Staff</span>
                       </label>
