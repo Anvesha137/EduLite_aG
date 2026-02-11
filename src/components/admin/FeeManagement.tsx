@@ -56,58 +56,92 @@ export function FeeManagement({ onViewProfile }: FeeManagementProps) {
 
       console.log('Fetching fees for:', { schoolId, currentAcademicYear });
 
-      let query = supabase
-        .from('student_fees')
+      // 1. Fetch ALL Students (Source of Truth)
+      let studentsQuery = supabase
+        .from('students')
         .select(`
-          *,
-          student:students(
             id,
             name,
             admission_number,
             class_id,
             section_id,
-            section:sections(id, name)
-          ),
-          class:classes(id, grade)
+            section:sections(id, name),
+            class:classes(id, name)
         `)
-        .eq('academic_year', currentAcademicYear);
-      // .eq('school_id', schoolId) // DEBUG: Removed filter to find where data is
+        .eq('school_id', schoolId)
+        // .eq('status', 'active') // REMOVED to show all students
+        .order('name');
+
+      // 2. Fetch Fee Records
+      let feesQuery = supabase
+        .from('student_fees')
+        .select('*')
+        .eq('academic_year', currentAcademicYear)
+        .eq('school_id', schoolId);
 
 
       if (filterClass) {
-        query = query.eq('class_id', filterClass);
-      }
-      if (filterStatus) {
-        query = query.eq('status', filterStatus);
-      }
-
-      const { data: feesData, error } = await query;
-
-      if (error) {
-        console.error('Error fetching fees:', error);
-        throw error;
+        studentsQuery = studentsQuery.eq('class_id', filterClass);
+        // We can't easily filter fees by class_id directly if we want to LEFT JOIN in JS, 
+        // but performance wise it's better to fetch relevant fees.
+        // However, standard fetch is okay for now.
       }
 
-      console.log('Raw Fees Data:', feesData);
+      const [studentsRes, feesRes] = await Promise.all([
+        studentsQuery,
+        feesQuery
+      ]);
 
-      const formattedData: StudentFeeData[] = (feesData || []).map((fee: any) => ({
-        id: fee.id,
-        student_id: fee.student?.id || fee.student_id,
-        student_name: fee.student?.name || 'Unknown Student',
-        admission_number: fee.student?.admission_number || 'N/A',
-        class_name: fee.class?.name || 'N/A',
-        section_name: fee.student?.section?.name || '',
-        total_fee: parseFloat(fee.total_fee),
-        discount_amount: parseFloat(fee.discount_amount || 0),
-        net_fee: parseFloat(fee.net_fee),
-        paid_amount: parseFloat(fee.paid_amount),
-        pending_amount: parseFloat(fee.pending_amount),
-        status: fee.status,
-        class_id: fee.class_id,
-        section_id: fee.student?.section_id,
-        school_id: fee.school_id, // Map for debug
-      }));
+      if (studentsRes.error) throw studentsRes.error;
+      const allStudents = studentsRes.data || [];
+      const allFees = feesRes.data || [];
 
+      // 3. Merge Data (Left Join)
+      const formattedData: StudentFeeData[] = allStudents.map((student: any) => {
+        const feeRecord = allFees.find((f: any) => f.student_id === student.id);
+
+        if (feeRecord) {
+          // Found Fee Record
+          return {
+            id: feeRecord.id,
+            student_id: student.id,
+            student_name: student.name,
+            admission_number: student.admission_number,
+            class_name: student.class?.name || 'N/A', // FIXED: .name not .grade
+            section_name: student.section?.name || '',
+            total_fee: parseFloat(feeRecord.total_fee),
+            discount_amount: parseFloat(feeRecord.discount_amount || 0),
+            net_fee: parseFloat(feeRecord.net_fee),
+            paid_amount: parseFloat(feeRecord.paid_amount),
+            pending_amount: parseFloat(feeRecord.pending_amount),
+            status: feeRecord.status,
+            class_id: student.class_id,
+            section_id: student.section_id,
+            school_id: schoolId || undefined,
+          };
+        } else {
+          // Missing Fee Record - Mock it with "No Record" status
+          return {
+            id: `mock-fee-${student.id}`, // Temporary ID
+            student_id: student.id,
+            student_name: student.name,
+            admission_number: student.admission_number,
+            class_name: student.class?.name || 'N/A', // FIXED: .name not .grade
+            section_name: student.section?.name || '',
+            total_fee: 0,
+            discount_amount: 0,
+            net_fee: 0,
+            paid_amount: 0,
+            pending_amount: 0,
+            status: 'not_generated', // Custom Status
+            class_id: student.class_id,
+            section_id: student.section_id,
+            school_id: schoolId || undefined,
+          };
+        }
+      });
+
+      console.log('Merged Fee Data:', formattedData);
       setStudentFees(formattedData);
 
       // Ensure we have some classes for filter if empty
@@ -118,8 +152,9 @@ export function FeeManagement({ onViewProfile }: FeeManagementProps) {
           { id: 'mock-c-3', grade: '9' }
         ]);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading fee data:', error);
+      alert('Error loading data: ' + (error.message || JSON.stringify(error)));
     } finally {
       setLoading(false);
     }
@@ -166,6 +201,8 @@ export function FeeManagement({ onViewProfile }: FeeManagementProps) {
         return 'bg-blue-100 text-blue-700';
       case 'overdue':
         return 'bg-red-100 text-red-700';
+      case 'not_generated':
+        return 'bg-slate-100 text-slate-500 border border-slate-200';
       default:
         return 'bg-amber-100 text-amber-700';
     }
@@ -179,6 +216,8 @@ export function FeeManagement({ onViewProfile }: FeeManagementProps) {
         return 'Partially Paid';
       case 'overdue':
         return 'Overdue';
+      case 'not_generated':
+        return 'No Record';
       default:
         return 'Unpaid';
     }
@@ -379,7 +418,14 @@ export function FeeManagement({ onViewProfile }: FeeManagementProps) {
 
           {filteredStudentFees.length === 0 && (
             <div className="text-center py-12 text-slate-500">
-              No fee records found for the selected filters
+              No fee records found for the selected filters.
+              <br />
+              <button
+                onClick={fixMissingData}
+                className="mt-2 text-blue-600 underline hover:text-blue-800"
+              >
+                Click here to fix missing data
+              </button>
             </div>
           )}
         </div>

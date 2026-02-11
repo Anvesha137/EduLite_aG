@@ -178,7 +178,7 @@ export default function IDCardManagement() {
         section:sections(name)
       `)
       .eq('school_id', schoolId)
-      .eq('status', 'active')
+      // .eq('status', 'active')
       .order('name');
 
     if (filterClass) {
