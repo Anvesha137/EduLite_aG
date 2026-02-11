@@ -78,8 +78,8 @@ export interface Student {
 export interface Class {
   id: string;
   school_id: string;
-  grade: string;
-  grade_order: number;
+  name: string;
+  sort_order: number;
   description: string | null;
   created_at: string;
 }

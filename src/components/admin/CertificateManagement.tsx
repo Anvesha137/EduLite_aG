@@ -16,7 +16,7 @@ interface Student {
   id: string;
   name: string;
   admission_number: string;
-  class: { grade: string };
+  class: { name: string };
   section: { name: string };
 }
 
@@ -118,7 +118,7 @@ export default function CertificateManagement() {
       .from('classes')
       .select('*')
       .eq('school_id', schoolId)
-      .order('grade_order');
+      .order('sort_order');
 
     if (data) {
       setClasses(data);
@@ -146,7 +146,7 @@ export default function CertificateManagement() {
         id,
         name,
         admission_number,
-        class:classes(grade),
+        class:classes(name),
         section:sections(name)
       `)
       .eq('school_id', schoolId)
@@ -518,7 +518,7 @@ export default function CertificateManagement() {
                 >
                   <option value="">Select Class</option>
                   {classes.map(c => (
-                    <option key={c.id} value={c.id}>{c.grade}</option>
+                    <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </select>
               </div>
@@ -564,7 +564,7 @@ export default function CertificateManagement() {
                         </td>
                         <td className="p-3 text-sm">{student.name}</td>
                         <td className="p-3 text-sm">{student.admission_number}</td>
-                        <td className="p-3 text-sm">{student.class?.grade}</td>
+                        <td className="p-3 text-sm">{student.class?.name}</td>
                         <td className="p-3 text-sm">{student.section?.name}</td>
                       </tr>
                     ))}
@@ -597,17 +597,17 @@ export default function CertificateManagement() {
                   <div className="flex items-start justify-between mb-2">
                     <div>
                       <h4 className="font-medium text-slate-800">{award.student.name}</h4>
-                      <p className="text-sm text-slate-600">{award.award_type.name}</p>
+                      <p className="text-sm text-slate-600">{award.award_type?.name}</p>
                     </div>
                     <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-1 rounded capitalize">
-                      {award.award_type.category}
+                      {award.award_type?.category}
                     </span>
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-sm mb-3">
                     <div><span className="text-slate-600">Event:</span> {award.event_name}</div>
                     <div><span className="text-slate-600">Date:</span> {new Date(award.event_date).toLocaleDateString()}</div>
                     {award.position && <div><span className="text-slate-600">Position:</span> {award.position}</div>}
-                    <div><span className="text-slate-600">Nominated by:</span> {award.nominated_by_profile.name}</div>
+                    <div><span className="text-slate-600">Nominated by:</span> {award.nominated_by_profile?.name}</div>
                   </div>
                   <div className="flex gap-2">
                     <button
@@ -656,7 +656,7 @@ export default function CertificateManagement() {
                   <div key={award.id} className="border border-slate-200 rounded-lg p-4 flex items-center justify-between">
                     <div>
                       <h4 className="font-medium text-slate-800">{award.student.name}</h4>
-                      <p className="text-sm text-slate-600">{award.award_type.name} - {award.event_name}</p>
+                      <p className="text-sm text-slate-600">{award.award_type?.name} - {award.event_name}</p>
                     </div>
                     <button
                       onClick={() => handleGenerateCertificates([award.id])}
@@ -685,7 +685,7 @@ export default function CertificateManagement() {
                 <div key={award.id} className="border border-slate-200 rounded-lg p-4 flex items-center justify-between">
                   <div>
                     <h4 className="font-medium text-slate-800">{award.student.name}</h4>
-                    <p className="text-sm text-slate-600">{award.award_type.name} - {award.event_name}</p>
+                    <p className="text-sm text-slate-600">{award.award_type?.name} - {award.event_name}</p>
                     <p className="text-xs text-slate-500 mt-1">
                       Issued on {new Date(award.created_at).toLocaleDateString()}
                     </p>
@@ -740,7 +740,7 @@ export default function CertificateManagement() {
                   <p className="text-sm text-slate-600">({previewAward.student.admission_number})</p>
 
                   <p className="text-lg text-slate-700 pt-4">Has been awarded</p>
-                  <h4 className="text-2xl font-bold text-slate-800">{previewAward.award_type.name}</h4>
+                  <h4 className="text-2xl font-bold text-slate-800">{previewAward.award_type?.name}</h4>
 
                   <div className="pt-4 pb-2">
                     <p className="text-slate-700">For the event</p>

@@ -146,7 +146,7 @@ export default function IDCardManagement() {
       .from('classes')
       .select('*')
       .eq('school_id', schoolId)
-      .order('grade_order');
+      .order('sort_order');
 
     if (data) {
       setClasses(data);
@@ -677,7 +677,7 @@ export default function IDCardManagement() {
                 >
                   <option value="">All Classes</option>
                   {classes.map(c => (
-                    <option key={c.id} value={c.id}>Class {c.grade}</option>
+                    <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </select>
 
@@ -752,7 +752,7 @@ export default function IDCardManagement() {
                       </td>
                       <td className="px-6 py-4 text-sm text-slate-600">
                         {activeTab === 'student_cards'
-                          ? `${entity.class?.grade || '-'} / ${entity.section?.name || '-'}`
+                          ? `${entity.class?.name || '-'} / ${entity.section?.name || '-'}`
                           : entity.designation}
                       </td>
                       <td className="px-6 py-4 text-right">

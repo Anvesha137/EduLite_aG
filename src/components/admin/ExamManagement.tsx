@@ -29,7 +29,7 @@ export function ExamManagement() {
     try {
       const [examsRes, classesRes, subjectsRes] = await Promise.all([
         supabase.from('exams').select('*, class:classes(*)').eq('school_id', schoolId).order('start_date', { ascending: false }),
-        supabase.from('classes').select('*').eq('school_id', schoolId).order('grade_order'),
+        supabase.from('classes').select('*').eq('school_id', schoolId).order('sort_order'),
         supabase.from('subjects').select('*').eq('school_id', schoolId).order('name'),
       ]);
 
@@ -107,7 +107,7 @@ export function ExamManagement() {
                   <div>
                     <p className="text-sm text-slate-600">Class</p>
                     <p className="font-medium text-slate-900">
-                      {(exam as any).class?.grade || 'All Classes'}
+                      {(exam as any).class?.name || 'All Classes'}
                     </p>
                   </div>
                   <div>
@@ -314,7 +314,7 @@ function ExamForm({ isOpen, onClose, exam, classes, onSave, schoolId }: ExamForm
           >
             <option value="">All Classes</option>
             {classes.map(cls => (
-              <option key={cls.id} value={cls.id}>{cls.grade}</option>
+              <option key={cls.id} value={cls.id}>{cls.name}</option>
             ))}
           </select>
         </div>
@@ -469,67 +469,71 @@ function MarksEntry({ isOpen, onClose, exam, subjects, schoolId }: MarksEntryPro
           </select>
         </div>
 
-        {selectedSubject && students.length > 0 && (
-          <>
-            <div className="overflow-x-auto max-h-96">
-              <table className="w-full">
-                <thead className="bg-slate-50 border-b border-slate-200 sticky top-0">
-                  <tr>
-                    <th className="text-left px-4 py-3 text-sm font-semibold text-slate-900">Student Name</th>
-                    <th className="text-center px-4 py-3 text-sm font-semibold text-slate-900">Marks Obtained</th>
-                    <th className="text-center px-4 py-3 text-sm font-semibold text-slate-900">Max Marks</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200">
-                  {students.map((student) => (
-                    <tr key={student.id}>
-                      <td className="px-4 py-3 text-sm text-slate-900">{student.name}</td>
-                      <td className="px-4 py-3">
-                        <input
-                          type="number"
-                          min="0"
-                          value={marks[student.id]?.obtained || 0}
-                          onChange={(e) => setMarks(prev => ({
-                            ...prev,
-                            [student.id]: { ...prev[student.id], obtained: parseFloat(e.target.value) || 0 }
-                          }))}
-                          className="w-24 mx-auto px-3 py-2 border border-slate-300 rounded-lg text-center focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        />
-                      </td>
-                      <td className="px-4 py-3">
-                        <input
-                          type="number"
-                          min="0"
-                          value={marks[student.id]?.max || 100}
-                          onChange={(e) => setMarks(prev => ({
-                            ...prev,
-                            [student.id]: { ...prev[student.id], max: parseFloat(e.target.value) || 100 }
-                          }))}
-                          className="w-24 mx-auto px-3 py-2 border border-slate-300 rounded-lg text-center focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        />
-                      </td>
+        {loading ? (
+          <div className="text-center py-8 text-slate-500">Loading marks...</div>
+        ) : (
+          selectedSubject && students.length > 0 && (
+            <>
+              <div className="overflow-x-auto max-h-96">
+                <table className="w-full">
+                  <thead className="bg-slate-50 border-b border-slate-200 sticky top-0">
+                    <tr>
+                      <th className="text-left px-4 py-3 text-sm font-semibold text-slate-900">Student Name</th>
+                      <th className="text-center px-4 py-3 text-sm font-semibold text-slate-900">Marks Obtained</th>
+                      <th className="text-center px-4 py-3 text-sm font-semibold text-slate-900">Max Marks</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200">
+                    {students.map((student) => (
+                      <tr key={student.id}>
+                        <td className="px-4 py-3 text-sm text-slate-900">{student.name}</td>
+                        <td className="px-4 py-3">
+                          <input
+                            type="number"
+                            min="0"
+                            value={marks[student.id]?.obtained || 0}
+                            onChange={(e) => setMarks(prev => ({
+                              ...prev,
+                              [student.id]: { ...prev[student.id], obtained: parseFloat(e.target.value) || 0 }
+                            }))}
+                            className="w-24 mx-auto px-3 py-2 border border-slate-300 rounded-lg text-center focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          />
+                        </td>
+                        <td className="px-4 py-3">
+                          <input
+                            type="number"
+                            min="0"
+                            value={marks[student.id]?.max || 100}
+                            onChange={(e) => setMarks(prev => ({
+                              ...prev,
+                              [student.id]: { ...prev[student.id], max: parseFloat(e.target.value) || 100 }
+                            }))}
+                            className="w-24 mx-auto px-3 py-2 border border-slate-300 rounded-lg text-center focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
 
-            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
-              <button
-                onClick={onClose}
-                className="px-6 py-2 border border-slate-300 text-slate-700 rounded-lg font-medium hover:bg-slate-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={saving}
-                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
-              >
-                {saving ? 'Saving...' : 'Save Marks'}
-              </button>
-            </div>
-          </>
+              <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
+                <button
+                  onClick={onClose}
+                  className="px-6 py-2 border border-slate-300 text-slate-700 rounded-lg font-medium hover:bg-slate-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+                >
+                  {saving ? 'Saving...' : 'Save Marks'}
+                </button>
+              </div>
+            </>
+          )
         )}
       </div>
     </Modal>

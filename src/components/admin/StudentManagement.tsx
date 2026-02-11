@@ -36,7 +36,7 @@ export function StudentManagement({ onViewProfile }: StudentManagementProps) {
     try {
       const [studentsRes, classesRes, sectionsRes] = await Promise.all([
         supabase.from('students').select('*, class:classes(*), section:sections(*), parent:parents(*)').eq('school_id', schoolId).order('admission_number'),
-        supabase.from('classes').select('*').eq('school_id', schoolId).order('grade_order'),
+        supabase.from('classes').select('*').eq('school_id', schoolId).order('sort_order'),
         supabase.from('sections').select('*').eq('school_id', schoolId),
       ]);
 
@@ -125,7 +125,7 @@ export function StudentManagement({ onViewProfile }: StudentManagementProps) {
         >
           <option value="">All Classes</option>
           {classes.map(cls => (
-            <option key={cls.id} value={cls.id}>{cls.grade}</option>
+            <option key={cls.id} value={cls.id}>{cls.name}</option>
           ))}
         </select>
         <select
@@ -169,7 +169,7 @@ export function StudentManagement({ onViewProfile }: StudentManagementProps) {
                     </button>
                   </td>
                   <td className="px-6 py-4 text-sm text-slate-900">
-                    {(student as any).class?.grade || '-'} {(student as any).section?.name || ''}
+                    {(student as any).class?.name || '-'} {(student as any).section?.name || ''}
                   </td>
                   <td className="px-6 py-4 text-sm text-slate-600">{formatDate(student.dob)}</td>
                   <td className="px-6 py-4 text-sm text-slate-600">
@@ -407,7 +407,7 @@ function StudentForm({ isOpen, onClose, student, classes, sections, onSave, scho
             >
               <option value="">Select Class</option>
               {classes.map(cls => (
-                <option key={cls.id} value={cls.id}>{cls.grade}</option>
+                <option key={cls.id} value={cls.id}>{cls.name}</option>
               ))}
             </select>
           </div>

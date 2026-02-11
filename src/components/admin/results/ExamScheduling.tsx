@@ -174,7 +174,7 @@ function ScheduleExamModal({ isOpen, onClose, schoolId, onSave }: any) {
     const loadDependencies = async () => {
         const [typesRes, classesRes] = await Promise.all([
             supabase.from('exam_types').select('*').eq('school_id', schoolId),
-            supabase.from('classes').select('*').eq('school_id', schoolId).order('grade_order')
+            supabase.from('classes').select('*').eq('school_id', schoolId).order('sort_order'),
         ]);
 
         // Handle Exam Types with Fallback
@@ -311,7 +311,7 @@ function ScheduleExamModal({ isOpen, onClose, schoolId, onSave }: any) {
                                         : 'border-slate-200 hover:border-blue-400'
                                         }`}
                                 >
-                                    <span className="font-bold">{cls.grade}</span>
+                                    <span className="font-bold">{cls.name}</span>
                                 </div>
                             ))}
                         </div>

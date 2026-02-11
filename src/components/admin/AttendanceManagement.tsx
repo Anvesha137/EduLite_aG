@@ -69,7 +69,7 @@ export function AttendanceManagement() {
   const loadClasses = async () => {
     try {
       const [classesRes, sectionsRes] = await Promise.all([
-        supabase.from('classes').select('*').eq('school_id', schoolId).order('grade_order'),
+        supabase.from('classes').select('*').eq('school_id', schoolId).order('sort_order'),
         supabase.from('sections').select('*').eq('school_id', schoolId),
       ]);
 
@@ -336,7 +336,7 @@ export function AttendanceManagement() {
             >
               <option value="">Select Class</option>
               {classes.map(cls => (
-                <option key={cls.id} value={cls.id}>{cls.grade}</option>
+                <option key={cls.id} value={cls.id}>{cls.name}</option>
               ))}
             </select>
           </div>

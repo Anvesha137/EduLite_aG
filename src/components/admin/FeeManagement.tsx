@@ -47,7 +47,7 @@ export function FeeManagement({ onViewProfile }: FeeManagementProps) {
     try {
       setLoading(true);
       const [classesRes, sectionsRes] = await Promise.all([
-        supabase.from('classes').select('*').eq('school_id', schoolId).order('grade_order'),
+        supabase.from('classes').select('*').eq('school_id', schoolId).order('sort_order'),
         supabase.from('sections').select('*').eq('school_id', schoolId),
       ]);
 
@@ -95,7 +95,7 @@ export function FeeManagement({ onViewProfile }: FeeManagementProps) {
         student_id: fee.student?.id || fee.student_id,
         student_name: fee.student?.name || 'Unknown Student',
         admission_number: fee.student?.admission_number || 'N/A',
-        class_name: fee.class?.grade || 'N/A',
+        class_name: fee.class?.name || 'N/A',
         section_name: fee.student?.section?.name || '',
         total_fee: parseFloat(fee.total_fee),
         discount_amount: parseFloat(fee.discount_amount || 0),
@@ -258,7 +258,7 @@ export function FeeManagement({ onViewProfile }: FeeManagementProps) {
           >
             <option value="">All Classes</option>
             {classes.map(cls => (
-              <option key={cls.id} value={cls.id}>{cls.grade}</option>
+              <option key={cls.id} value={cls.id}>{cls.name}</option>
             ))}
           </select>
           <select

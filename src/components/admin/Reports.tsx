@@ -63,7 +63,7 @@ export function Reports() {
     const processedData = attendanceData?.map((a: any) => ({
       student_name: a.students?.name || 'Unknown',
       admission_number: a.students?.admission_number || 'N/A',
-      class: a.students?.class?.grade || 'N/A',
+      class: a.students?.class?.name || 'N/A',
       date: a.date,
       status: a.status,
       remarks: a.remarks || '-'
@@ -106,7 +106,7 @@ export function Reports() {
     const processedData = feesData?.map((fee: any) => ({
       student_name: fee.student?.name || 'Unknown',
       admission_number: fee.student?.admission_number || 'N/A',
-      class_grade: fee.class?.grade || 'N/A',
+      class_grade: fee.class?.name || 'N/A',
       section_name: fee.section?.name || '',
       total_fee: fee.total_fee,
       amount_paid: fee.paid_amount, // Show full paid amount in table
@@ -199,7 +199,7 @@ export function Reports() {
     const processedData = studentsData?.map((s: any) => ({
       name: s.name,
       admission_number: s.admission_number,
-      class: s.classes?.grade || 'N/A',
+      class: s.classes?.name || 'N/A',
       section: s.sections?.name || 'N/A',
       parent_name: s.parent?.name || 'N/A',
       status: s.status,

@@ -16,7 +16,7 @@ interface Lead {
   parent_name: string;
   contact_number: string;
   contact_email: string;
-  applying_class: { id: string; grade: string };
+  applying_class?: { id: string; name: string };
   current_stage: { id: string; name: string; color_code: string; stage_category: string };
   lead_source: { id: string; name: string };
   status: string;
@@ -33,7 +33,7 @@ interface Application {
   student_name: string;
   parent_name: string;
   contact_number: string;
-  applying_class: { grade: string };
+  applying_class?: { name: string };
   status: string;
   decision_status: string;
   application_date: string;
@@ -56,7 +56,7 @@ interface LeadSource {
 
 interface Class {
   id: string;
-  grade: string;
+  name: string;
 }
 
 export default function AdmissionsManagement() {
@@ -219,9 +219,9 @@ export default function AdmissionsManagement() {
   const loadClasses = async () => {
     const { data } = await supabase
       .from('classes')
-      .select('id, grade')
+      .select('id, name, sort_order')
       .eq('school_id', schoolId)
-      .order('grade');
+      .order('sort_order');
     if (data) setClasses(data);
   };
 
@@ -250,7 +250,7 @@ export default function AdmissionsManagement() {
           parent_name: l.parent_name,
           contact_number: l.contact_number,
           contact_email: l.contact_email,
-          applying_class: { grade: l.applying_class_grade },
+          applying_class: { name: l.applying_class_grade },
           current_stage: {
             id: l.current_stage_id,
             name: l.current_stage_name,
@@ -288,7 +288,7 @@ export default function AdmissionsManagement() {
           student_name: a.student_name,
           parent_name: a.parent_name,
           contact_number: a.contact_number,
-          applying_class: { grade: a.applying_class_grade },
+          applying_class: { name: a.applying_class_grade },
           status: a.status,
           decision_status: a.decision_status,
           application_date: a.application_date,
@@ -682,7 +682,7 @@ export default function AdmissionsManagement() {
                       <td className="px-6 py-4 text-sm text-slate-900">{lead.student_name || '-'}</td>
                       <td className="px-6 py-4 text-sm text-slate-900">{lead.parent_name}</td>
                       <td className="px-6 py-4 text-sm text-slate-900">{lead.contact_number}</td>
-                      <td className="px-6 py-4 text-sm text-slate-900">{lead.applying_class?.grade || '-'}</td>
+                      <td className="px-6 py-4 text-sm text-slate-900">{lead.applying_class?.name || '-'}</td>
                       <td className="px-6 py-4">
                         <span
                           className="px-2 py-1 rounded-full text-xs font-medium"
@@ -798,7 +798,7 @@ export default function AdmissionsManagement() {
                       <td className="px-6 py-4 text-sm text-slate-900">{app.student_name}</td>
                       <td className="px-6 py-4 text-sm text-slate-900">{app.parent_name}</td>
                       <td className="px-6 py-4 text-sm text-slate-900">{app.contact_number}</td>
-                      <td className="px-6 py-4 text-sm text-slate-900">{app.applying_class?.grade}</td>
+                      <td className="px-6 py-4 text-sm text-slate-900">{app.applying_class?.name}</td>
                       <td className="px-6 py-4 text-sm text-slate-600">{formatDate(app.application_date)}</td>
                       <td className="px-6 py-4">
                         <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 capitalize">
@@ -1041,7 +1041,7 @@ export default function AdmissionsManagement() {
                 <option value="">Select Class</option>
                 {classes.length > 0 ? (
                   classes.map(cls => (
-                    <option key={cls.id} value={cls.id}>{cls.grade}</option>
+                    <option key={cls.id} value={cls.id}>{cls.name}</option>
                   ))
                 ) : (
                   GRADE_LEVELS.map(grade => (
@@ -1436,7 +1436,7 @@ export default function AdmissionsManagement() {
             </div>
             <div>
               <p className="text-slate-500">Class</p>
-              <p className="font-medium text-slate-900">{selectedApplication?.applying_class?.grade}</p>
+              <p className="font-medium text-slate-900">{selectedApplication?.applying_class?.name}</p>
             </div>
             <div>
               <p className="text-slate-500">Contact</p>

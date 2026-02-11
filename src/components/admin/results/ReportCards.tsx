@@ -52,7 +52,7 @@ export function ReportCards() {
             if (data) {
                 // Map to match expected format: { class_id, grade }
                 // The RPC returns classes table rows { id, grade, ... }
-                setClasses(data.map((c: any) => ({ class_id: c.id, grade: c.grade })));
+                setClasses(data.map((c: any) => ({ class_id: c.id, name: c.name })));
             }
         } catch (err) {
             console.error('Error loading classes:', err);
@@ -141,7 +141,7 @@ export function ReportCards() {
                         disabled={!selectedExamId}
                     >
                         <option value="">Choose Class...</option>
-                        {classes.map(c => <option key={c.class_id} value={c.class_id}>{c.grade}</option>)}
+                        {classes.map(c => <option key={c.class_id} value={c.class_id}>{c.name}</option>)}
                     </select>
                 </div>
                 <div>

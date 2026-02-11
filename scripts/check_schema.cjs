@@ -1,22 +1,28 @@
-
 const { createClient } = require('@supabase/supabase-js');
 const path = require('path');
 const dotenv = require('dotenv');
 
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
-const supabase = createClient(process.env.VITE_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_SERVICE_ROLE_KEY);
+const supabaseUrl = process.env.VITE_SUPABASE_URL;
+const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function checkSchema() {
-    const { error } = await supabase.from('teacher_allocations').select('id').limit(1);
+    console.log('Checking classes table schema...');
+
+    const { data, error } = await supabase
+        .from('classes')
+        .select('*')
+        .limit(1);
+
     if (error) {
-        if (error.code === '42P01') { // undefined_table
-            console.log('Table teacher_allocations DOES NOT EXIST. Using legacy schema.');
-        } else {
-            console.log('Error checking table:', error.message);
-        }
+        console.error('Error fetching classes:', error);
     } else {
-        console.log('Table teacher_allocations EXISTS. Using strict schema.');
+        console.log('Classes sample row:', data);
+        if (data && data.length > 0) {
+            console.log('Keys:', Object.keys(data[0]));
+        }
     }
 }
 

@@ -76,7 +76,7 @@ export function AdminDashboard() {
       const [studentsRes, educatorsRes, classesRes, attendanceRes] = await Promise.all([
         supabase.from('students').select('*').eq('school_id', schoolId).eq('status', 'active'),
         supabase.from('educators').select('*').eq('school_id', schoolId).eq('status', 'active'),
-        supabase.from('classes').select('*').eq('school_id', schoolId).order('grade_order'),
+        supabase.from('classes').select('*').eq('school_id', schoolId).order('sort_order'),
         supabase.from('attendance').select('*').eq('school_id', schoolId).eq('date', today),
       ]);
 
@@ -189,10 +189,10 @@ export function AdminDashboard() {
                 <div key={cls.id} className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                      <span className="text-blue-600 font-bold text-sm">{cls.grade}</span>
+                      <span className="text-blue-600 font-bold text-sm">{cls.name}</span>
                     </div>
                     <div>
-                      <p className="font-medium text-slate-900">{cls.grade}</p>
+                      <p className="font-medium text-slate-900">{cls.name}</p>
                       <p className="text-sm text-slate-600">{classStudents.length} students</p>
                     </div>
                   </div>
@@ -260,7 +260,7 @@ export function AdminDashboard() {
                   <tr key={student.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-4 py-3 text-sm text-slate-900">{student.admission_number}</td>
                     <td className="px-4 py-3 text-sm font-medium text-slate-900">{student.name}</td>
-                    <td className="px-4 py-3 text-sm text-slate-900">{studentClass?.grade || '-'}</td>
+                    <td className="px-4 py-3 text-sm text-slate-900">{studentClass?.name || '-'}</td>
                     <td className="px-4 py-3">
                       <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full">
                         {student.status}

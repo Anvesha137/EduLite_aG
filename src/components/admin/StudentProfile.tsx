@@ -106,7 +106,7 @@ export function StudentProfile({ studentId, onBack }: StudentProfileProps) {
                     student_id: feeData.student_id,
                     student_name: (studentData as any).name,
                     admission_number: (studentData as any).admission_number,
-                    class_name: (studentData as any).class?.grade || '',
+                    class_name: (studentData as any).class?.name || '',
                     section_name: (studentData as any).section?.name || '',
                     total_fee: parseFloat(feeData.total_fee),
                     discount_amount: parseFloat(feeData.discount_amount || 0),
@@ -287,7 +287,7 @@ export function StudentProfile({ studentId, onBack }: StudentProfileProps) {
                             <div className="grid grid-cols-2 gap-4 text-sm">
                                 <div>
                                     <p className="text-slate-500">Class</p>
-                                    <p className="font-medium text-slate-900">{typedStudent.class?.grade || '-'} {typedStudent.section?.name || ''}</p>
+                                    <p className="font-medium text-slate-900">{typedStudent.class?.name || '-'} {typedStudent.section?.name || ''}</p>
                                 </div>
                                 <div>
                                     <p className="text-slate-500">Gender</p>

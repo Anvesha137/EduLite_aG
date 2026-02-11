@@ -8,8 +8,8 @@ import { formatDateTime } from '../../lib/helpers';
 
 interface ClassData {
   id: string;
-  grade: string;
-  grade_order: number;
+  name: string;
+  sort_order: number;
 }
 
 interface SectionData {
@@ -54,7 +54,7 @@ export function AnnouncementManagement() {
               const [classesResult, sectionsResult, audiencesResult] = await Promise.all([
                 supabase
                   .from('announcement_target_classes')
-                  .select('class_id, classes(id, grade, grade_order)')
+                  .select('class_id, classes(id, name, sort_order)')
                   .eq('announcement_id', announcement.id),
                 supabase
                   .from('announcement_target_sections')
@@ -122,8 +122,8 @@ export function AnnouncementManagement() {
 
     if (announcement.target_classes && announcement.target_classes.length > 0) {
       const classNames = announcement.target_classes
-        .sort((a, b) => a.grade_order - b.grade_order)
-        .map(c => c.grade)
+        .sort((a, b) => a.sort_order - b.sort_order)
+        .map(c => c.name)
         .join(', ');
       parts.push(`Classes: ${classNames}`);
     }
@@ -165,33 +165,30 @@ export function AnnouncementManagement() {
         {announcements.map((announcement) => (
           <div
             key={announcement.id}
-            className={`bg-white rounded-xl shadow-sm border ${
-              announcement.priority === 'urgent'
-                ? 'border-red-300'
-                : announcement.priority === 'high'
+            className={`bg-white rounded-xl shadow-sm border ${announcement.priority === 'urgent'
+              ? 'border-red-300'
+              : announcement.priority === 'high'
                 ? 'border-amber-300'
                 : 'border-slate-200'
-            } p-6`}
+              } p-6`}
           >
             <div className="flex items-start justify-between">
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-2">
                   <h3 className="text-lg font-bold text-slate-900">{announcement.title}</h3>
                   <span
-                    className={`px-3 py-1 rounded-full text-xs font-medium ${
-                      announcement.priority === 'urgent'
-                        ? 'bg-red-100 text-red-700'
-                        : announcement.priority === 'high'
+                    className={`px-3 py-1 rounded-full text-xs font-medium ${announcement.priority === 'urgent'
+                      ? 'bg-red-100 text-red-700'
+                      : announcement.priority === 'high'
                         ? 'bg-amber-100 text-amber-700'
                         : 'bg-blue-100 text-blue-700'
-                    }`}
+                      }`}
                   >
                     {announcement.priority.toUpperCase()}
                   </span>
                   <span
-                    className={`px-3 py-1 rounded-full text-xs font-medium ${
-                      announcement.is_active ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-700'
-                    }`}
+                    className={`px-3 py-1 rounded-full text-xs font-medium ${announcement.is_active ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-700'
+                      }`}
                   >
                     {announcement.is_active ? 'Active' : 'Inactive'}
                   </span>
@@ -235,11 +232,10 @@ export function AnnouncementManagement() {
                 </button>
                 <button
                   onClick={() => toggleActive(announcement)}
-                  className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
-                    announcement.is_active
-                      ? 'bg-amber-50 hover:bg-amber-100 text-amber-700'
-                      : 'bg-green-50 hover:bg-green-100 text-green-700'
-                  }`}
+                  className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${announcement.is_active
+                    ? 'bg-amber-50 hover:bg-amber-100 text-amber-700'
+                    : 'bg-green-50 hover:bg-green-100 text-green-700'
+                    }`}
                 >
                   {announcement.is_active ? 'Deactivate' : 'Activate'}
                 </button>
@@ -335,9 +331,9 @@ function AnnouncementForm({ isOpen, onClose, announcement, onSave, schoolId }: A
       const [classesResult, sectionsResult] = await Promise.all([
         supabase
           .from('classes')
-          .select('id, grade, grade_order')
+          .select('id, name, sort_order')
           .eq('school_id', schoolId)
-          .order('grade_order'),
+          .order('sort_order'),
         supabase
           .from('sections')
           .select('id, name, class_id')
@@ -404,8 +400,8 @@ function AnnouncementForm({ isOpen, onClose, announcement, onSave, schoolId }: A
     if (selectedClasses.length > 0) {
       const classNames = classes
         .filter(c => selectedClasses.includes(c.id))
-        .sort((a, b) => a.grade_order - b.grade_order)
-        .map(c => c.grade)
+        .sort((a, b) => a.sort_order - b.sort_order)
+        .map(c => c.name)
         .join(', ');
       parts.push(`Classes: ${classNames}`);
     }
@@ -415,7 +411,7 @@ function AnnouncementForm({ isOpen, onClose, announcement, onSave, schoolId }: A
         .filter(s => selectedSections.includes(s.id))
         .map(s => {
           const cls = classes.find(c => c.id === s.class_id);
-          return cls ? `${cls.grade}-${s.name}` : s.name;
+          return cls ? `${cls.name}-${s.name}` : s.name;
         })
         .join(', ');
       parts.push(`Sections: ${sectionDetails}`);
@@ -625,7 +621,7 @@ function AnnouncementForm({ isOpen, onClose, announcement, onSave, schoolId }: A
                       onChange={() => toggleClass(cls.id)}
                       className="w-4 h-4 text-blue-600"
                     />
-                    <span className="text-sm text-slate-700">{cls.grade}</span>
+                    <span className="font-bold">Class {cls.name}</span>
                   </label>
                 ))}
               </div>
@@ -645,7 +641,7 @@ function AnnouncementForm({ isOpen, onClose, announcement, onSave, schoolId }: A
                   return (
                     <div key={cls.id} className="space-y-2">
                       <div className="flex items-center justify-between bg-slate-50 p-2 rounded">
-                        <span className="text-sm font-medium text-slate-900">{cls.grade}</span>
+                        <span className="text-sm font-medium text-slate-900">{cls.name}</span>
                         <button
                           type="button"
                           onClick={() => toggleAllSectionsForClass(cls.id)}
