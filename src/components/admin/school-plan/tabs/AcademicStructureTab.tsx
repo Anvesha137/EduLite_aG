@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit2, Archive, ChevronRight, ChevronDown, BookOpen, Layers } from 'lucide-react';
+import { Plus, Edit2, ChevronRight, ChevronDown, BookOpen, Layers, Trash2 } from 'lucide-react';
 import { supabase } from '../../../../lib/supabase';
 import { useSchool } from '../../../../hooks/useSchool';
+import { logChange } from '../../../../lib/audit';
 import { ClassModal } from '../modals/ClassModal';
 import { SectionModal } from '../modals/SectionModal';
 import { SubjectModal } from '../modals/SubjectModal';
+import { ClassSubjectsModal } from '../modals/ClassSubjectsModal';
 
 // Types
 interface ClassData {
@@ -54,6 +56,8 @@ export function AcademicStructureTab() {
     // Modal State - Subjects
     const [showSubjectModal, setShowSubjectModal] = useState(false);
     const [selectedSubject, setSelectedSubject] = useState<SubjectData | undefined>(undefined);
+
+    const [showClassSubjectsModal, setShowClassSubjectsModal] = useState(false);
 
     useEffect(() => {
         if (schoolId) {
@@ -110,6 +114,67 @@ export function AcademicStructureTab() {
         }
     };
 
+    const handleDeleteClass = async (classId: string, className: string) => {
+        if (!schoolId) return;
+
+        // 1. Check dependencies via RPC
+        setLoading(true);
+        try {
+            const { data: safetyCheck, error: checkError } = await supabase.rpc('check_class_safe_delete', { p_class_id: classId });
+
+            if (checkError) throw checkError;
+
+            if (!safetyCheck.safe) {
+                alert(`Cannot delete class ${className}.\n\nDependencies found:\n` +
+                    `- Sections: ${safetyCheck.dependencies.sections}\n` +
+                    `- Students: ${safetyCheck.dependencies.students}\n` +
+                    `- Subjects: ${safetyCheck.dependencies.subjects}\n` +
+                    `- Teacher Allocations: ${safetyCheck.dependencies.allocations}\n` +
+                    `- Fee Structures: ${safetyCheck.dependencies.fees}\n\n` +
+                    `Please remove these dependencies first.`
+                );
+                return;
+            }
+
+            // 2. Confirm
+            if (!confirm(`Are you sure you want to delete class "${className}"? This action cannot be undone.`)) return;
+
+            // 3. Delete
+            const { error: deleteError } = await supabase.from('classes').delete().eq('id', classId);
+            if (deleteError) throw deleteError;
+
+            await logChange(schoolId, 'class', classId, 'deleted', className, null, `Deleted Class: ${className}`);
+
+            fetchStructure();
+        } catch (error: any) {
+            console.error('Error deleting class:', error);
+            alert('Failed to delete class: ' + error.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleDeleteSection = async (sectionId: string, sectionName: string, className: string) => {
+        if (!schoolId) return;
+        if (!confirm(`Delete section "${sectionName}" from ${className}?`)) return;
+
+        try {
+            const { error } = await supabase.from('sections').delete().eq('id', sectionId);
+            if (error) {
+                // Supabase FK constraints might block this if students exist, even if we didn't check explicitly via RPC for sections.
+                // But check_class_safe_delete handles CLASS deletion. Section deletion usually needs its own checks or relies on FK.
+                throw error;
+            }
+
+            await logChange(schoolId, 'section', sectionId, 'deleted', `${className} - ${sectionName}`, null, `Deleted Section: ${sectionName} from ${className}`);
+
+            fetchStructure();
+        } catch (error: any) {
+            console.error('Error deleting section:', error);
+            alert('Failed to delete section. Ensure no students/teachers are assigned.');
+        }
+    };
+
     const toggleExpand = (classId: string) => {
         const newExpanded = new Set(expandedClasses);
         if (newExpanded.has(classId)) {
@@ -162,8 +227,8 @@ export function AcademicStructureTab() {
                 <button
                     onClick={() => setActiveSubTab('classes')}
                     className={`pb-2 px-4 font-medium transition-colors border-b-2 ${activeSubTab === 'classes'
-                        ? 'text-blue-600 border-blue-600'
-                        : 'text-slate-500 border-transparent hover:text-slate-700'
+                            ? 'text-blue-600 border-blue-600'
+                            : 'text-slate-500 border-transparent hover:text-slate-700'
                         }`}
                 >
                     Classes & Sections
@@ -171,8 +236,8 @@ export function AcademicStructureTab() {
                 <button
                     onClick={() => setActiveSubTab('subjects')}
                     className={`pb-2 px-4 font-medium transition-colors border-b-2 ${activeSubTab === 'subjects'
-                        ? 'text-blue-600 border-blue-600'
-                        : 'text-slate-500 border-transparent hover:text-slate-700'
+                            ? 'text-blue-600 border-blue-600'
+                            : 'text-slate-500 border-transparent hover:text-slate-700'
                         }`}
                 >
                     Subjects & Activities
@@ -240,8 +305,22 @@ export function AcademicStructureTab() {
                                             >
                                                 <Edit2 className="w-4 h-4" />
                                             </button>
-                                            <button className="p-1.5 text-slate-600 hover:bg-slate-100 rounded" title="Archive">
-                                                <Archive className="w-4 h-4" />
+                                            <button
+                                                onClick={() => handleDeleteClass(cls.id, cls.name)}
+                                                className="p-1.5 text-red-600 hover:bg-red-50 rounded"
+                                                title="Delete Class"
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                onClick={() => {
+                                                    setSelectedClass(cls);
+                                                    setShowClassSubjectsModal(true);
+                                                }}
+                                                className="p-1.5 text-purple-600 hover:bg-purple-50 rounded"
+                                                title="Manage Subjects"
+                                            >
+                                                <BookOpen className="w-4 h-4" />
                                             </button>
                                             <button
                                                 onClick={() => {
@@ -276,6 +355,13 @@ export function AcademicStructureTab() {
                                                                     className="text-slate-400 hover:text-blue-600"
                                                                 >
                                                                     <Edit2 className="w-3 h-3" />
+                                                                </button>
+                                                                <button
+                                                                    onClick={() => handleDeleteSection(sec.id, sec.name, cls.name)}
+                                                                    className="text-slate-400 hover:text-red-600"
+                                                                    title="Delete Section"
+                                                                >
+                                                                    <Trash2 className="w-3 h-3" />
                                                                 </button>
                                                             </div>
                                                         </div>
@@ -405,7 +491,7 @@ export function AcademicStructureTab() {
                 onClose={() => setShowClassModal(false)}
                 onSuccess={fetchStructure}
                 initialData={selectedClass}
-                schoolId={schoolId}
+                schoolId={schoolId || ''}
             />
 
             <SectionModal
@@ -414,7 +500,7 @@ export function AcademicStructureTab() {
                 onSuccess={fetchStructure}
                 classId={targetClassId}
                 initialData={selectedSection}
-                schoolId={schoolId}
+                schoolId={schoolId || ''}
             />
 
             <SubjectModal
@@ -422,7 +508,15 @@ export function AcademicStructureTab() {
                 onClose={() => setShowSubjectModal(false)}
                 onSuccess={fetchStructure}
                 initialData={selectedSubject}
-                schoolId={schoolId}
+                schoolId={schoolId || ''}
+            />
+
+            <ClassSubjectsModal
+                isOpen={showClassSubjectsModal}
+                onClose={() => setShowClassSubjectsModal(false)}
+                classId={selectedClass?.id || ''}
+                className={selectedClass?.name || ''}
+                schoolId={schoolId || ''}
             />
         </div>
     );

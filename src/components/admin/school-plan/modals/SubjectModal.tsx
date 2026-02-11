@@ -74,9 +74,9 @@ export function SubjectModal({ isOpen, onClose, onSuccess, initialData, schoolId
             }
             onSuccess();
             onClose();
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error saving subject:', error);
-            alert('Failed to save subject. Code must be unique.');
+            alert('Failed to save subject: ' + (error.message || 'Unknown error'));
         } finally {
             setLoading(false);
         }
@@ -88,7 +88,7 @@ export function SubjectModal({ isOpen, onClose, onSuccess, initialData, schoolId
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
             <div className="bg-white rounded-lg w-full max-w-md p-6">
                 <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-lg font-bold">{initialData ? 'Edit Subject/Activity' : 'Add New Subject/Activity'}</h3>
+                    <h3 className="text-lg font-bold">{initialData ? 'Edit Subject/Activity' : 'Add Subject/Activity'}</h3>
                     <button onClick={onClose}><X className="w-5 h-5 text-slate-500" /></button>
                 </div>
 

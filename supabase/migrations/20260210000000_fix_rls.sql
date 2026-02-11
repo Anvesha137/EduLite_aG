@@ -1,0 +1,2 @@
+-- Redundant migration temporarily disabled to unblock db push
+-- Policies for user_profiles and academic_years are already defined in previous migrations.
