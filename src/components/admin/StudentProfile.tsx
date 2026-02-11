@@ -274,21 +274,21 @@ export function StudentProfile({ studentId, onBack }: StudentProfileProps) {
                         </h3>
 
                         <div className="space-y-4">
-                            <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                            <div className="flex items-center gap-6 p-6 bg-slate-50 rounded-lg">
                                 {typedStudent.photo_url ? (
                                     <img
                                         src={typedStudent.photo_url}
                                         alt={typedStudent.name}
-                                        className="w-16 h-16 rounded-full object-cover border border-slate-200"
+                                        className="w-32 h-32 rounded-lg object-cover border-2 border-slate-200 shadow-sm"
                                     />
                                 ) : (
-                                    <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-2xl border border-blue-200">
+                                    <div className="w-32 h-32 bg-blue-100 rounded-lg flex items-center justify-center text-blue-600 font-bold text-4xl border-2 border-blue-200">
                                         {typedStudent.name.charAt(0)}
                                     </div>
                                 )}
                                 <div>
-                                    <p className="font-medium text-slate-900 text-lg">{typedStudent.name}</p>
-                                    <p className="text-sm text-slate-500 uppercase font-semibold">{typedStudent.status}</p>
+                                    <p className="font-bold text-slate-900 text-2xl">{typedStudent.name}</p>
+                                    <p className="text-sm text-slate-500 uppercase font-semibold mt-1 tracking-wide">{typedStudent.status}</p>
                                 </div>
                             </div>
 
