@@ -21,7 +21,7 @@ interface StudentReportSummary {
     subject_count: number;
 }
 
-export function ReportCards() {
+export function ReportCards({ educatorId }: { educatorId: string | null }) {
     const { user } = useAuth();
     const [myClasses, setMyClasses] = useState<ClassOption[]>([]);
     const [selectedClass, setSelectedClass] = useState<string>('');
@@ -29,11 +29,16 @@ export function ReportCards() {
     const [selectedExam, setSelectedExam] = useState<string>('');
 
     const [reportData, setReportData] = useState<StudentReportSummary[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        if (user) loadInitialData();
-    }, [user]);
+        console.log("ReportCards mounted. EducatorId:", educatorId);
+        if (user && educatorId) {
+            loadInitialData(educatorId);
+        } else {
+            console.log("ReportCards skipped load. User:", !!user, "EducatorId:", educatorId);
+        }
+    }, [user, educatorId]);
 
     useEffect(() => {
         if (selectedClass && selectedExam) {
@@ -41,31 +46,28 @@ export function ReportCards() {
         }
     }, [selectedClass, selectedExam]);
 
-    const loadInitialData = async () => {
+    const loadInitialData = async (id: string) => {
         try {
             setLoading(true);
-            // 1. Get Class Teacher Classes
-            const { data: educator } = await supabase.from('educators').select('id').eq('user_id', user?.id).single();
-            if (!educator) return;
-
+            // 1. Get Class Teacher Classes using passed ID
             const { data: assignments } = await supabase
                 .from('educator_class_assignments')
                 .select(`
-           class_id, section_id,
-           class:classes(grade),
+           class_id, section_id, is_class_teacher,
+           class:classes(name),
            section:sections(name)
         `)
-                .eq('educator_id', educator.id)
-                .eq('is_class_teacher', true)
-                .eq('status', 'active');
+                .eq('educator_id', id);
 
             if (assignments) {
-                const options = assignments.map((a: any) => ({
-                    class_id: a.class_id,
-                    section_id: a.section_id,
-                    class_name: a.class.grade,
-                    section_name: a.section.name
-                }));
+                const options = assignments
+                    .filter((a: any) => a.class && a.section && a.is_class_teacher)
+                    .map((a: any) => ({
+                        class_id: a.class_id,
+                        section_id: a.section_id,
+                        class_name: a.class.name,
+                        section_name: a.section.name
+                    }));
                 setMyClasses(options);
                 if (options.length > 0) setSelectedClass(`${options[0].class_id}-${options[0].section_id}`);
             }
@@ -155,8 +157,8 @@ export function ReportCards() {
         }
     };
 
-    if (loading && myClasses.length === 0) {
-        return <div className="p-8 text-center">Loading...</div>;
+    if (loading) {
+        return <div className="p-8 text-center text-slate-500">Loading Report data...</div>;
     }
 
     if (myClasses.length === 0) {

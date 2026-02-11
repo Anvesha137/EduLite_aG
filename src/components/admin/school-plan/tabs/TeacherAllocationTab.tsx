@@ -149,9 +149,19 @@ export function TeacherAllocationTab() {
         }
         setSaving(true);
         try {
-            const changes: any[] = [];
+            const inserts: any[] = [];
             const logsToCommit: (() => Promise<void>)[] = [];
-            const promises: Promise<any>[] = [];
+
+            // We need to clear existing allocations for this class/year before re-inserting.
+            // This is the safest way to ensure we strictly reflect the grid state.
+            // WARNING: This deletes ALL assignments for this class/year.
+            const { error: deleteError } = await supabase
+                .from('educator_class_assignments')
+                .delete()
+                .eq('class_id', selectedClassId)
+                .eq('academic_year', academicYear);
+
+            if (deleteError) throw deleteError;
 
             // 1. Class Teachers
             for (const sec of sections) {
@@ -159,7 +169,7 @@ export function TeacherAllocationTab() {
                 const teacherId = allocations[key];
 
                 if (teacherId) {
-                    changes.push({
+                    inserts.push({
                         school_id: schoolId,
                         class_id: selectedClassId,
                         section_id: sec.id,
@@ -171,18 +181,7 @@ export function TeacherAllocationTab() {
 
                     const tName = teachers.find(t => t.id === teacherId)?.name || teacherId;
                     const cName = classes.find(c => c.id === selectedClassId)?.name;
-
                     logsToCommit.push(() => logChange(schoolId, 'teacher_allocation', `${sec.id}_CT`, 'assigned', 'unknown', teacherId, `Assigned Class Teacher: ${tName} to ${cName} - ${sec.name}`));
-
-                } else {
-                    // Delete
-                    promises.push(
-                        supabase.from('educator_class_assignments').delete()
-                            .eq('class_id', selectedClassId)
-                            .eq('section_id', sec.id)
-                            .eq('is_class_teacher', true)
-                            .eq('academic_year', academicYear) as unknown as Promise<any>
-                    );
                 }
 
                 // 2. Subject Teachers
@@ -191,7 +190,7 @@ export function TeacherAllocationTab() {
                     const subTeacherId = allocations[subKey];
 
                     if (subTeacherId) {
-                        changes.push({
+                        inserts.push({
                             school_id: schoolId,
                             class_id: selectedClassId,
                             section_id: sec.id,
@@ -202,39 +201,14 @@ export function TeacherAllocationTab() {
                         });
 
                         const tName = teachers.find(t => t.id === subTeacherId)?.name || subTeacherId;
-
                         logsToCommit.push(() => logChange(schoolId, 'teacher_allocation', `${sec.id}_${sub.id}`, 'assigned', 'unknown', subTeacherId, `Assigned ${tName} to ${sub.name} (${sec.name})`));
-                    } else {
-                        promises.push(
-                            supabase.from('educator_class_assignments').delete()
-                                .eq('class_id', selectedClassId)
-                                .eq('section_id', sec.id)
-                                .eq('subject_id', sub.id)
-                                .eq('academic_year', academicYear) as unknown as Promise<any>
-                        );
                     }
                 }
             }
 
-            // Execute deletions
-            await Promise.all(promises);
-
-            // Execute upserts
-            if (changes.length > 0) {
-                const { error } = await supabase.from('educator_class_assignments').upsert(changes, {
-                    onConflict: 'class_id,section_id,subject_id,academic_year,is_class_teacher'
-                    // Note: Check if conflict constraint matches DB. 
-                    // Usually it's unique(class_id, section_id, subject_id, academic_year) for subjects
-                    // And unique(class_id, section_id, is_class_teacher, academic_year) for CT?
-                    // If the DB constraint is broader, this might fail.
-                    // For now, relying on Supabase to handle it or standard upsert.
-                    // Actually, 'educator_class_assignments' might not have a single unique constraint for all these.
-                    // Better to just INSERT and let duplicates fail? Or Upsert if ID is present? 
-                    // We don't have IDs here.
-                    // Let's rely on standard upsert without specifying ON CONFLICT if the table has a clear PK, 
-                    // or specify the constraints if we know them.
-                    // Given previous errors, let's try WITHOUT onConflict arg first, allowing PG to infer if there's a PK.
-                });
+            // Execute Inserts
+            if (inserts.length > 0) {
+                const { error } = await supabase.from('educator_class_assignments').insert(inserts);
                 if (error) throw error;
             }
 

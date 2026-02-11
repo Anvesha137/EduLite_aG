@@ -34,38 +34,71 @@ export function TeacherDashboard() {
         localStorage.setItem(STORAGE_KEY, currentView);
     }, [currentView]);
 
+    // Mock Mode: Allow switching educators
+    const [allEducators, setAllEducators] = useState<any[]>([]);
+    const [selectedEducatorId, setSelectedEducatorId] = useState<string | null>(null);
+
     useEffect(() => {
         if (user) {
-            loadTeacherData();
+            checkMockModeAndLoad();
         }
     }, [user]);
 
-    const loadTeacherData = async () => {
+    // Added dependency on selectedEducatorId to reload when switched
+    useEffect(() => {
+        if (selectedEducatorId) {
+            loadTeacherData(selectedEducatorId);
+        }
+    }, [selectedEducatorId]);
+
+    const checkMockModeAndLoad = async () => {
+        setLoading(true);
         try {
-            setLoading(true);
-            // Get Educator ID linked to Auth User
-            const { data: educatorData, error: eduError } = await supabase
+            // 1. Fetch ALL educators for the switch dropdown
+            // In a real app we'd get school_id from context/profile, here we assume single tenant or linked
+            const { data: educators } = await supabase
+                .from('educators')
+                .select('id, name, employee_id')
+                .eq('status', 'active')
+                .order('name');
+
+            setAllEducators(educators || []);
+
+            // 2. Determine initial educator
+            // Try to find one linked to the current mock user
+            const { data: linkedEducator } = await supabase
                 .from('educators')
                 .select('id')
                 .eq('user_id', user?.id)
                 .single();
 
-            if (eduError) throw eduError;
-            if (!educatorData) return;
+            if (linkedEducator) {
+                setSelectedEducatorId(linkedEducator.id);
+            } else if (educators && educators.length > 0) {
+                // Fallback to first educator if no link (e.g. testing new teachers)
+                setSelectedEducatorId(educators[0].id);
+            }
 
-            const educatorId = educatorData.id;
+        } catch (error) {
+            console.error('Error init dashboard:', error);
+            setLoading(false);
+        }
+    };
 
-            // Fetch Assignments
+    const loadTeacherData = async (educatorId: string) => {
+        try {
+            setLoading(true);
+
+            // Fetch Assignments for the SELECTED educator
             const { data: assignments, error: assignError } = await supabase
                 .from('educator_class_assignments')
                 .select(`
           *,
-          class:classes(id, grade, grade_order),
+          class:classes(id, name, sort_order),
           section:sections(id, name),
           subject:subjects(id, name, code)
         `)
                 .eq('educator_id', educatorId)
-                .eq('status', 'active'); // Ensure we respect active status
 
             if (assignError) throw assignError;
 
@@ -73,7 +106,7 @@ export function TeacherDashboard() {
                 // Process Classes (Unique Class-Section combos)
                 const uniqueClasses = new Map();
                 assignments.forEach((a: any) => {
-                    const key = `${a.class.id}-${a.section.id}`;
+                    const key = `${a.class?.id}-${a.section?.id}`;
                     if (!uniqueClasses.has(key)) {
                         uniqueClasses.set(key, {
                             class: a.class,
@@ -95,6 +128,9 @@ export function TeacherDashboard() {
                     section: a.section
                 }));
                 setMySubjects(subjectsList);
+            } else {
+                setMyClasses([]);
+                setMySubjects([]);
             }
 
         } catch (error) {
@@ -142,7 +178,7 @@ export function TeacherDashboard() {
                         <div key={idx} className="p-4 border border-slate-200 rounded-lg hover:bg-slate-50 transition">
                             <div className="flex justify-between items-start mb-2">
                                 <div>
-                                    <h4 className="font-bold text-slate-900">{cls.class.grade} - {cls.section.name}</h4>
+                                    <h4 className="font-bold text-slate-900">{cls.class?.name} - {cls.section?.name}</h4>
                                     <p className="text-xs text-slate-500">{cls.is_class_teacher ? 'Class Teacher' : 'Subject Teacher'}</p>
                                 </div>
                                 {cls.is_class_teacher && <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">CT</span>}
@@ -170,6 +206,30 @@ export function TeacherDashboard() {
             title="Teacher Dashboard"
             navigation={navigation}
         >
+            {/* Mock Mode Switcher */}
+            <div className="mb-6 bg-amber-50 border border-amber-200 p-4 rounded-lg flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <div className="bg-amber-100 p-2 rounded-full hidden sm:block">
+                        <UserCheck className="w-5 h-5 text-amber-700" />
+                    </div>
+                    <div>
+                        <h3 className="font-bold text-amber-900 text-sm">Viewing as Educator</h3>
+                        <p className="text-xs text-amber-700">Select an educator to see their assigned classes.</p>
+                    </div>
+                </div>
+                <select
+                    className="border-amber-300 bg-white text-amber-900 text-sm rounded-md shadow-sm focus:ring-amber-500 focus:border-amber-500 p-2 min-w-[200px]"
+                    value={selectedEducatorId || ''}
+                    onChange={(e) => setSelectedEducatorId(e.target.value)}
+                >
+                    {allEducators.map(edu => (
+                        <option key={edu.id} value={edu.id}>
+                            {edu.name} ({edu.employee_id})
+                        </option>
+                    ))}
+                </select>
+            </div>
+
             {loading ? (
                 <div className="flex items-center justify-center h-64">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -177,11 +237,11 @@ export function TeacherDashboard() {
             ) : (
                 <>
                     {currentView === 'dashboard' && renderDashboard()}
-                    {currentView === 'my-classes' && <MyClasses />}
+                    {currentView === 'my-classes' && <MyClasses educatorId={selectedEducatorId} />}
                     {currentView === 'my-subjects' && <div className="text-center py-20 text-slate-500">My Subjects Interface Coming Soon</div>}
-                    {currentView === 'attendance' && <AttendanceView />}
-                    {currentView === 'marks' && <MarksEntry />}
-                    {currentView === 'reports' && <ReportCards />}
+                    {currentView === 'attendance' && <AttendanceView educatorId={selectedEducatorId} />}
+                    {currentView === 'marks' && <MarksEntry educatorId={selectedEducatorId} />}
+                    {currentView === 'reports' && <ReportCards educatorId={selectedEducatorId} />}
                     {currentView === 'settings' && <div className="text-center py-20 text-slate-500">Settings Interface Coming Soon</div>}
                 </>
             )}

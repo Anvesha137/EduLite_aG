@@ -17,48 +17,44 @@ interface ClassAssignment {
     student_count: number;
 }
 
-export function MyClasses() {
+export function MyClasses({ educatorId }: { educatorId: string | null }) {
     const { user } = useAuth();
     const [classes, setClasses] = useState<ClassAssignment[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (user) {
-            fetchClasses();
+        if (educatorId) {
+            fetchClasses(educatorId);
         }
-    }, [user]);
+    }, [educatorId]);
 
-    const fetchClasses = async () => {
+    const fetchClasses = async (id: string) => {
         try {
             setLoading(true);
-            // Get Educator ID
-            const { data: educatorData } = await supabase
-                .from('educators')
-                .select('id')
-                .eq('user_id', user?.id)
-                .single();
-
-            if (!educatorData) return;
 
             // Get Assignments
-            const { data: assignments } = await supabase
+            const { data: assignments, error } = await supabase
                 .from('educator_class_assignments')
                 .select(`
           class_id,
           section_id,
           is_class_teacher,
-          class:classes(id, grade, grade_order),
+          class:classes(id, name, sort_order),
           section:sections(id, name),
           subject:subjects(id, name, code)
         `)
-                .eq('educator_id', educatorData.id)
-                .eq('status', 'active');
+                .eq('educator_id', id)
+            // .eq('status', 'active'); // removed for safety
+
+            if (error) throw error;
 
             if (assignments) {
                 // Group by Class-Section
                 const grouped = new Map<string, ClassAssignment>();
 
                 for (const a of assignments as any[]) {
+                    if (!a.class || !a.section) continue;
+
                     const key = `${a.class.id}-${a.section.id}`;
 
                     if (!grouped.has(key)) {
@@ -74,7 +70,7 @@ export function MyClasses() {
                             class_id: a.class.id,
                             section_id: a.section.id,
                             is_class_teacher: a.is_class_teacher, // If multiples, true takes precedence ideally
-                            class_name: a.class.grade,
+                            class_name: a.class.name,
                             section_name: a.section.name,
                             subjects: [],
                             student_count: count || 0
@@ -123,8 +119,8 @@ export function MyClasses() {
                                     <h3 className="text-xl font-bold text-slate-900">{cls.class_name} - {cls.section_name}</h3>
                                     <div className="flex items-center gap-2 mt-1">
                                         <span className={`text-xs px-2 py-1 rounded-full font-medium ${cls.is_class_teacher
-                                                ? 'bg-blue-100 text-blue-800'
-                                                : 'bg-slate-100 text-slate-600'
+                                            ? 'bg-blue-100 text-blue-800'
+                                            : 'bg-slate-100 text-slate-600'
                                             }`}>
                                             {cls.is_class_teacher ? 'Class Teacher' : 'Subject Teacher'}
                                         </span>

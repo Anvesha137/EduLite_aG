@@ -20,19 +20,24 @@ interface StudentAttendance {
     attendance_id?: string; // Existing record ID
 }
 
-export function AttendanceView() {
+export function AttendanceView({ educatorId }: { educatorId: string | null }) {
     const { user } = useAuth();
     const [myClasses, setMyClasses] = useState<ClassOption[]>([]);
     const [selectedClass, setSelectedClass] = useState<string>(''); // format: "classId-sectionId"
     const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
     const [students, setStudents] = useState<StudentAttendance[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
     useEffect(() => {
-        if (user) loadClassTeacherClasses();
-    }, [user]);
+        console.log("AttendanceView mounted. EducatorId:", educatorId);
+        if (educatorId) {
+            loadClassTeacherClasses(educatorId);
+        } else {
+            console.log("No educatorId passed to AttendanceView");
+        }
+    }, [educatorId]);
 
     useEffect(() => {
         if (selectedClass && selectedDate) {
@@ -40,31 +45,34 @@ export function AttendanceView() {
         }
     }, [selectedClass, selectedDate]);
 
-    const loadClassTeacherClasses = async () => {
+    const loadClassTeacherClasses = async (id: string) => {
         try {
             setLoading(true);
-            const { data: educator } = await supabase.from('educators').select('id').eq('user_id', user?.id).single();
-            if (!educator) return;
 
             const { data: assignments } = await supabase
                 .from('educator_class_assignments')
                 .select(`
-           class_id, section_id,
-           class:classes(grade),
+           class_id, section_id, is_class_teacher,
+           class:classes(name),
            section:sections(name)
         `)
-                .eq('educator_id', educator.id)
-                .eq('is_class_teacher', true)
-                .eq('status', 'active');
+                .eq('educator_id', id);
+
+            console.log("AttendanceView raw assignments:", assignments);
 
             if (assignments) {
-                const options = assignments.map((a: any) => ({
-                    class_id: a.class_id,
-                    section_id: a.section_id,
-                    class_name: a.class.grade,
-                    section_name: a.section.name
-                }));
+                const options = assignments
+                    .filter((a: any) => a.class && a.section && a.is_class_teacher)
+                    .map((a: any) => ({
+                        class_id: a.class_id,
+                        section_id: a.section_id,
+                        class_name: a.class.name,
+                        section_name: a.section.name
+                    }));
+
+                console.log("AttendanceView processed options:", options);
                 setMyClasses(options);
+
                 if (options.length > 0) {
                     setSelectedClass(`${options[0].class_id}-${options[0].section_id}`);
                 }
@@ -181,8 +189,8 @@ export function AttendanceView() {
         }
     };
 
-    if (loading && myClasses.length === 0) {
-        return <div className="p-8 text-center">Loading classes...</div>;
+    if (loading) {
+        return <div className="p-8 text-center text-slate-500">Loading classes data...</div>;
     }
 
     if (myClasses.length === 0) {

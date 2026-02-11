@@ -28,7 +28,7 @@ interface StudentMark {
     mark_id?: string;
 }
 
-export function MarksEntry() {
+export function MarksEntry({ educatorId }: { educatorId: string | null }) {
     const { user } = useAuth();
     const [exams, setExams] = useState<ExamOption[]>([]);
     const [selectedExam, setSelectedExam] = useState<string>('');
@@ -44,10 +44,10 @@ export function MarksEntry() {
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
     useEffect(() => {
-        if (user) {
-            loadInitialData();
+        if (user && educatorId) {
+            loadInitialData(educatorId);
         }
-    }, [user]);
+    }, [user, educatorId]);
 
     useEffect(() => {
         if (selectedExam && selectedSubject) {
@@ -55,7 +55,7 @@ export function MarksEntry() {
         }
     }, [selectedExam, selectedSubject]);
 
-    const loadInitialData = async () => {
+    const loadInitialData = async (id: string) => {
         try {
             setLoading(true);
 
@@ -76,37 +76,38 @@ export function MarksEntry() {
                 if (examsData.length > 0) setSelectedExam(examsData[0].id);
             }
 
-            // 2. Fetch My Subjects (As Subject Teacher)
-            const { data: educator } = await supabase.from('educators').select('id').eq('user_id', user?.id).single();
-            if (!educator) return;
-
+            // 2. Fetch My Subjects (As Subject Teacher) using passed ID
             const { data: assignments } = await supabase
                 .from('educator_class_assignments')
                 .select(`
            class_id, section_id, subject_id,
-           class:classes(grade),
+           class:classes(name),
            section:sections(name),
            subject:subjects(id, name, code)
         `)
-                .eq('educator_id', educator.id)
-                .eq('status', 'active')
+                .eq('educator_id', id)
+                // .eq('status', 'active')
                 .not('subject_id', 'is', null);
 
             if (assignments) {
-                const options = assignments.map((a: any) => ({
-                    id: a.subject.id,
-                    name: a.subject.name,
-                    code: a.subject.code,
-                    class_id: a.class_id,
-                    section_id: a.section_id,
-                    class_name: a.class.grade,
-                    section_name: a.section.name
-                }));
+                const options = assignments
+                    .filter((a: any) => a.class && a.section && a.subject)
+                    .map((a: any) => ({
+                        id: a.subject.id,
+                        name: a.subject.name,
+                        code: a.subject.code,
+                        class_id: a.class_id,
+                        section_id: a.section_id,
+                        class_name: a.class.name,
+                        section_name: a.section.name
+                    }));
                 setMySubjects(options);
                 if (options.length > 0) {
                     setSelectedSubject(`${options[0].id}-${options[0].class_id}-${options[0].section_id}`);
                 }
             }
+
+
 
         } catch (err) {
             console.error('Error loading initial data', err);
