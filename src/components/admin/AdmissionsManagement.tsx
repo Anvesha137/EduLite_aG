@@ -68,9 +68,14 @@ export default function AdmissionsManagement() {
 
   useEffect(() => {
     const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        setUserId(user.id);
+      try {
+        const { data, error } = await supabase.auth.getUser();
+        if (error) throw error;
+        if (data?.user) {
+          setUserId(data.user.id);
+        }
+      } catch (err) {
+        console.error('Error fetching user:', err);
       }
     };
     getUser();
@@ -226,20 +231,20 @@ export default function AdmissionsManagement() {
         // Transform RPC result to match Lead interface structure
         const mappedLeads = data.map((l: any) => ({
           id: l.id,
-          lead_number: l.lead_number,
-          student_name: l.student_name,
-          parent_name: l.parent_name,
-          contact_number: l.contact_number,
-          contact_email: l.contact_email,
-          applying_class: { name: l.applying_class_grade },
+          lead_number: l.lead_number || '',
+          student_name: l.student_name || '',
+          parent_name: l.parent_name || '',
+          contact_number: l.contact_number || '',
+          contact_email: l.contact_email || '',
+          applying_class: { name: l.applying_class_grade || '-' },
           current_stage: {
             id: l.current_stage_id,
-            name: l.current_stage_name,
-            color_code: l.current_stage_color
+            name: l.current_stage_name || '-',
+            color_code: l.current_stage_color || '#cbd5e1'
           },
-          lead_source: { id: l.lead_source_id, name: l.lead_source_name },
-          status: l.status,
-          priority: l.priority,
+          lead_source: { id: l.lead_source_id, name: l.lead_source_name || '-' },
+          status: l.status || 'unknown',
+          priority: l.priority || 'medium',
           next_followup_date: l.next_followup_date,
           created_at: l.created_at
         }));
@@ -265,15 +270,15 @@ export default function AdmissionsManagement() {
       if (data) {
         const mappedApps = data.map((a: any) => ({
           id: a.id,
-          application_number: a.application_number,
-          student_name: a.student_name,
-          parent_name: a.parent_name,
-          contact_number: a.contact_number,
-          applying_class: { name: a.applying_class_grade },
-          status: a.status,
-          decision_status: a.decision_status,
+          application_number: a.application_number || '',
+          student_name: a.student_name || '',
+          parent_name: a.parent_name || '',
+          contact_number: a.contact_number || '',
+          applying_class: { name: a.applying_class_grade || '-' },
+          status: a.status || 'unknown',
+          decision_status: a.decision_status || 'pending',
           application_date: a.application_date,
-          lead: { lead_number: a.lead_number }
+          lead: { lead_number: a.lead_number || '' }
         }));
         setApplications(mappedApps);
       }
@@ -473,12 +478,15 @@ export default function AdmissionsManagement() {
   };
 
   const filteredLeads = leads.filter(lead => {
-    const matchesSearch =
-      lead.lead_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.student_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.parent_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      lead.contact_number.includes(searchTerm);
-    return matchesSearch;
+    const searchStrings = [
+      lead.lead_number,
+      lead.student_name,
+      lead.parent_name,
+      lead.contact_number
+    ].map(s => (s || '').toLowerCase());
+
+    const term = searchTerm.toLowerCase();
+    return searchStrings.some(s => s.includes(term));
   });
 
   const getPriorityColor = (priority: string) => {
