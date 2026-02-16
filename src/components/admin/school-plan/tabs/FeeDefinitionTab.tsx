@@ -50,9 +50,13 @@ export function FeeDefinitionTab() {
         if (!editingType.name || !schoolId) return;
 
         try {
+            // Generate a simple code from name if not present
+            const code = editingType.name.toUpperCase().replace(/\s+/g, '_');
+
             const payload = {
                 school_id: schoolId,
                 name: editingType.name,
+                code: code, // Added code to payload
                 description: editingType.description,
                 recurring: editingType.recurring ?? true,
                 mandatory: editingType.mandatory ?? true,
